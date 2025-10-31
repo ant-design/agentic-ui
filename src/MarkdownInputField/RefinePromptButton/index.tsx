@@ -17,10 +17,10 @@ type RefinePromptButtonProps = {
 export const RefinePromptButton: React.FC<RefinePromptButtonProps> = (
   props,
 ) => {
-  const { isHover, disabled, status, onRefine, style } = props;
+  const { disabled, status, onRefine } = props;
   const { getPrefixCls } = useContext(ConfigProvider.ConfigContext);
   const baseCls = getPrefixCls('agentic-md-input-field-refine-button');
-  const { wrapSSR, hashId } = useStyle(baseCls);
+  const { wrapSSR } = useStyle(baseCls);
 
   const handleClick = () => {
     if (disabled) return;

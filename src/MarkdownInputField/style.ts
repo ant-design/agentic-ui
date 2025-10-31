@@ -12,7 +12,7 @@ const GLOW_BORDER_OFFSET = 2; // px - 辉光边框偏移量
 const GLOW_BORDER_TOTAL_OFFSET = GLOW_BORDER_OFFSET * 2; // 2px - 总偏移量（上下左右）
 
 // CSS helpers for glow border effect - 辉光边框效果的 CSS 助手函数
-const getGlowBorderOffset = () => `-${GLOW_BORDER_OFFSET}px`;
+// const getGlowBorderOffset = () => `-${GLOW_BORDER_OFFSET}px`;
 
 // 不需要 calc() 包裹的所有关键字
 const DIRECT_RETURN_KEYWORDS: ReadonlySet<string> = new Set([
