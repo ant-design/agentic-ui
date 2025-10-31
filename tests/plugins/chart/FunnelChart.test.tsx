@@ -457,4 +457,105 @@ describe('FunnelChart', () => {
       expect(screen.getByTestId('chart-statistic')).toBeInTheDocument();
     });
   });
+
+  describe('bottomLayerMinWidth 测试', () => {
+    it('应该支持设置最小宽度占比', () => {
+      render(
+        <FunnelChart
+          data={sampleData}
+          bottomLayerMinWidth={0.1}
+          title="最小宽度控制"
+        />,
+      );
+
+      expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+    });
+
+    it('应该处理 0 值（不限制最小宽度）', () => {
+      render(
+        <FunnelChart
+          data={sampleData}
+          bottomLayerMinWidth={0}
+          title="无最小宽度限制"
+        />,
+      );
+
+      expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+    });
+
+    it('应该处理边界值 1（最小宽度等于最大宽度）', () => {
+      render(
+        <FunnelChart
+          data={sampleData}
+          bottomLayerMinWidth={1}
+          title="最小宽度等于最大宽度"
+        />,
+      );
+
+      expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+    });
+
+    it('应该将超出范围的值（>1）视为不限制', () => {
+      render(
+        <FunnelChart
+          data={sampleData}
+          bottomLayerMinWidth={1.5}
+          title="超出范围的最小宽度"
+        />,
+      );
+
+      // 应该正常渲染，且行为等同于 bottomLayerMinWidth={0}
+      expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+    });
+
+    it('应该将负值视为不限制', () => {
+      render(
+        <FunnelChart
+          data={sampleData}
+          bottomLayerMinWidth={-0.1}
+          title="负值最小宽度"
+        />,
+      );
+
+      // 应该正常渲染，且行为等同于 bottomLayerMinWidth={0}
+      expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+    });
+
+    it('应该在数据跨度大时应用最小宽度', () => {
+      const largeRangeData: FunnelChartDataItem[] = [
+        { category: '默认', x: '曝光', y: 100000, ratio: 20 },
+        { category: '默认', x: '点击', y: 20000, ratio: 30 },
+        { category: '默认', x: '注册', y: 6000, ratio: 50 },
+        { category: '默认', x: '付费', y: 100, ratio: 0 },
+      ];
+
+      render(
+        <FunnelChart
+          data={largeRangeData}
+          bottomLayerMinWidth={0.15}
+          title="大跨度数据最小宽度"
+        />,
+      );
+
+      expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+    });
+
+    it('应该在数据跨度小时不影响显示', () => {
+      const smallRangeData: FunnelChartDataItem[] = [
+        { category: '默认', x: '步骤1', y: 100, ratio: 90 },
+        { category: '默认', x: '步骤2', y: 90, ratio: 88 },
+        { category: '默认', x: '步骤3', y: 85, ratio: 0 },
+      ];
+
+      render(
+        <FunnelChart
+          data={smallRangeData}
+          bottomLayerMinWidth={0.15}
+          title="小跨度数据最小宽度"
+        />,
+      );
+
+      expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+    });
+  });
 });
