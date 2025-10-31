@@ -68,6 +68,7 @@ const genStyle: GenerateStyle<ChatTokenType> = (token) => {
             height: '100%',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'center',
           },
 
         '.ant-segmented-item': {
