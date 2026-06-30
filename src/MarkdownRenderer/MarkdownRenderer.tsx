@@ -139,11 +139,12 @@ const InternalMarkdownRenderer = forwardRef<
 
   const safeContent = useStreaming(displayedText, streaming);
 
+  // 逐词淡入是否生效：流式 + 未显式关闭。单一来源，同时驱动 token 拆分与容器类。
+  const fadeActive = streaming && throttleOptions?.fade !== false;
+
   const reactContent = useMarkdownToReact(safeContent, {
     remarkPlugins: mergedRemarkPlugins,
-    rehypePlugins: mergedRehypePlugins.length
-      ? mergedRehypePlugins
-      : undefined,
+    rehypePlugins: mergedRehypePlugins.length ? mergedRehypePlugins : undefined,
     htmlConfig,
     formula: formulaConfig,
     components,
@@ -151,6 +152,7 @@ const InternalMarkdownRenderer = forwardRef<
     linkConfig,
     fncProps,
     streaming,
+    fadeTokens: fadeActive,
     // 修订追踪用未限流的完整 source，保证缓存键随真实流入推进，而非随限流帧抖动。
     contentRevisionSource: streaming ? sourceText : undefined,
     eleRender,
@@ -171,6 +173,7 @@ const InternalMarkdownRenderer = forwardRef<
           className={clsx(
             contentCls,
             `${contentCls}-markdown-readonly`,
+            { [`${contentCls}-streaming`]: fadeActive },
             hashId,
           )}
           style={{ whiteSpace: 'normal', wordWrap: 'normal' }}

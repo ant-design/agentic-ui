@@ -26,6 +26,14 @@ group:
 
 ## Unreleased
 
+- MarkdownEditor
+  - 🐞 Fixed **table flickering**: removed the table row entry animation outright (`agenticMdBlurFadeIn` on `tbody tr` plus its reduced-motion fallback). Incremental streaming updates remount table rows and replay the blur fade-in, which shows up as flickering; the animation is now deleted instead of being defined and then overridden off. The `agenticMdBlurFadeIn` keyframes are kept solely for the `MarkdownRenderer` streaming word-by-word fade-in.
+
+- MarkdownRenderer
+  - 🆕 Added GPT-style streaming word-by-word fade-in: while `streaming`, newly appearing words fade in individually, already-shown content reuses DOM without replaying the animation or flickering. Pure CSS driven, honors `prefers-reduced-motion`, and skips code blocks / tables / formulas when splitting tokens.
+  - 🆕 The fade-in toggle is consolidated into `throttleOptions.fade` (default `true`, only effective when `streaming`): pass `throttleOptions={{ fade: false }}` to disable. All streaming-display config now lives in the single `throttleOptions` object, so `MarkdownEditor` (`renderMode: 'markdown'`) and `Bubble.markdownRenderConfig` pick it up through the existing `throttleOptions` passthrough.
+  - 🛠 The fade-in splits text tokens via a rehype plugin registered last on the final hast; the processor stays the same instance across a streaming session to avoid unmounting/remounting charts and code blocks.
+
 - TaskList
   - 🛠 `simple` variant drops the 2px progress bar underneath the summary; `showProgress` now only toggles the inline "completed/total" count text.
   - 🆕 Added `scrollIntoViewOnExpand` (`boolean | ScrollIntoViewOptions`, default `false`): when the `simple` summary expands, scroll the component into the viewport. `true` resolves to `{ behavior: 'smooth', block: 'nearest' }`; the initial mount does not trigger it.

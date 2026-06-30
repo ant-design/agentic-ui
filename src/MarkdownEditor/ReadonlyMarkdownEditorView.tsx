@@ -8,8 +8,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { resolveContainerContentStyle } from '../Constants/contentPaddingVars';
 import { useFormulaConfig } from '../Config';
+import { resolveContainerContentStyle } from '../Constants/contentPaddingVars';
 import { MarkdownRenderer } from '../MarkdownRenderer';
 import type { MarkdownRendererRef } from '../MarkdownRenderer/types';
 import { CommentList } from './editor/components/CommentList';
@@ -21,9 +21,7 @@ import {
   bindReadonlyCommentClick,
   clearReadonlyCommentHighlights,
 } from './readonly/applyReadonlyCommentHighlights';
-import {
-  createReadonlyMarkdownEditorInstance,
-} from './readonly/ReadonlyMarkdownEditorStore';
+import { createReadonlyMarkdownEditorInstance } from './readonly/ReadonlyMarkdownEditorStore';
 import { useStyle } from './style';
 import type { CommentDataType, MarkdownEditorProps } from './types';
 import { sanitizeEditorChromeStyle } from './utils/sanitizeChromeStyle';

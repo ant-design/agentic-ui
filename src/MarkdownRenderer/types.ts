@@ -1,9 +1,9 @@
 import type React from 'react';
+import type { FormulaConfig } from '../Config/formulaConfig';
 import type {
   MarkdownRemarkPlugin,
   MarkdownToHtmlConfig,
 } from '../MarkdownEditor/editor/utils/markdownToHtml';
-import type { FormulaConfig } from '../Config/formulaConfig';
 import type { MarkdownEditorPlugin } from '../MarkdownEditor/plugin';
 import type { MarkdownEditorProps } from '../MarkdownEditor/types';
 import type { AttachmentFile } from '../MarkdownInputField/AttachmentButton/types';
@@ -53,6 +53,8 @@ export interface ContentThrottleOptions {
   backgroundBatchMultiplier?: number;
   /** 为 false 时关闭限流，流式内容即时渲染 */
   enabled?: boolean;
+  /** GPT 风格逐词淡入开关，默认 true；为 false 时流式内容即时显示（无淡入） */
+  fade?: boolean;
 }
 
 export interface MarkdownRendererProps {
@@ -60,7 +62,10 @@ export interface MarkdownRendererProps {
   streaming?: boolean;
   /** 流式是否已结束；为 true 时限流器立即 flush 剩余内容 */
   isFinished?: boolean;
-  /** 流式限流配置；streaming 为 true 且未设 enabled: false 时默认开启 */
+  /**
+   * 流式限流与展示配置；streaming 为 true 且未设 enabled: false 时默认开启限流。
+   * GPT 风格逐词淡入由 `throttleOptions.fade` 控制（默认开启，传 false 关闭）。
+   */
   throttleOptions?: ContentThrottleOptions;
   plugins?: MarkdownEditorPlugin[];
   remarkPlugins?: MarkdownRemarkPlugin[];

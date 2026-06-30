@@ -26,6 +26,14 @@ group:
 
 ## 未发布
 
+- MarkdownEditor
+  - 🐞 修复**表格闪动**：直接删除表格行入场动画（`tbody tr` 的 `agenticMdBlurFadeIn` 及其 reduced-motion 兜底）。流式增量更新会反复重挂表格行使该 blur 淡入反复重放，表现为闪动；现彻底移除该动画，不再「定义动画再用类名覆盖关闭」。`agenticMdBlurFadeIn` keyframes 仅保留供 `MarkdownRenderer` 流式逐词淡入使用。
+
+- MarkdownRenderer
+  - 🆕 新增 GPT 风格的流式逐词淡入动画：`streaming` 时默认对新出现的词语逐个淡入，已显示内容复用 DOM、不重放动画、不闪烁；纯 CSS 驱动，自动尊重 `prefers-reduced-motion`，代码块 / 表格 / 公式不参与拆词。
+  - 🆕 逐词淡入开关收敛到 `throttleOptions.fade`（默认 `true`，仅 `streaming` 时生效）：传 `throttleOptions={{ fade: false }}` 关闭。流式展示配置统一在 `throttleOptions` 一个对象内，`MarkdownEditor`（`renderMode: 'markdown'`）与 `Bubble.markdownRenderConfig` 经既有 `throttleOptions` 透传即可生效。
+  - 🛠 逐词淡入通过末注册的 rehype 插件在最终 hast 上拆分文本 token，processor 在流式会话内保持同一实例，避免 chart / 代码块因 processor 变更而卸载重挂。
+
 - TaskList
   - 🛠 `simple` 模式移除摘要条下方 2px 细线进度条；`showProgress` 现仅控制摘要内「已完成/总数」计数文本是否展示。
   - 🆕 新增 `scrollIntoViewOnExpand` 属性（`boolean | ScrollIntoViewOptions`，默认 `false`）：`simple` 模式下展开摘要条时将组件滚动到视窗内；传 `true` 走默认 `{ behavior: 'smooth', block: 'nearest' }`，初次挂载不触发。
