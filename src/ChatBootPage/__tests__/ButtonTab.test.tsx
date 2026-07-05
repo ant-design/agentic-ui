@@ -96,6 +96,22 @@ describe('ButtonTab 组件', () => {
     expect(handleClick).not.toHaveBeenCalled();
   });
 
+  it('disabled 时图标键盘事件不触发 onIconClick', () => {
+    const handleIconClick = vi.fn();
+
+    render(
+      <ButtonTab disabled icon={<TestIcon />} onIconClick={handleIconClick}>
+        禁用图标
+      </ButtonTab>,
+    );
+
+    const iconElement = screen.getByTestId('test-icon').parentElement!;
+    fireEvent.keyDown(iconElement, { key: 'Enter' });
+    fireEvent.keyDown(iconElement, { key: ' ' });
+
+    expect(handleIconClick).not.toHaveBeenCalled();
+  });
+
   it('应该处理键盘事件（Enter键）', () => {
     const handleClick = vi.fn();
 
