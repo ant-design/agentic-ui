@@ -55,6 +55,21 @@ describe('normalizeTaskListPropsFromJson', () => {
     const result = normalizeTaskListPropsFromJson({ items: [] });
     expect(result.variant).toBe('simple');
   });
+
+  it('coerces numeric key to string', () => {
+    const result = normalizeTaskListPropsFromJson([
+      { key: 42, title: 'Num key' },
+    ]);
+    expect(result.items[0].key).toBe('42');
+  });
+
+  it('ignores non-object entries in items array', () => {
+    const result = normalizeTaskListPropsFromJson({
+      items: [null, 1, { key: 'ok', title: 'T' }],
+    });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].key).toBe('ok');
+  });
 });
 
 describe('normalizeToolUseBarPropsFromJson', () => {
@@ -114,6 +129,36 @@ describe('normalizeToolUseBarPropsFromJson', () => {
     expect(result.light).toBe(true);
     expect(result.disableAnimation).toBe(true);
   });
+
+  it('falls back to key when id is missing', () => {
+    const result = normalizeToolUseBarPropsFromJson({
+      tools: [{ key: 'tool-key', toolName: 'search' }],
+    });
+    expect(result.tools[0].id).toBe('tool-key');
+  });
+
+  it('defaults invalid tool status to idle', () => {
+    const result = normalizeToolUseBarPropsFromJson({
+      tools: [{ id: '1', toolName: 'x', status: 'unknown' }],
+    });
+    expect(result.tools[0].status).toBe('idle');
+  });
+
+  it('maps items without key to index id', () => {
+    const result = normalizeToolUseBarPropsFromJson({
+      items: [{ text: 'query' }],
+    });
+    expect(result.tools[0].id).toBe('0');
+    expect(result.tools[0].toolName).toBe('query');
+  });
+
+  it('skips items entries without text', () => {
+    const result = normalizeToolUseBarPropsFromJson({
+      items: [{ key: '1' }, { text: 'ok' }],
+    });
+    expect(result.tools).toHaveLength(1);
+    expect(result.tools[0].toolName).toBe('ok');
+  });
 });
 
 describe('normalizeFileMapPropsFromJson', () => {
@@ -162,5 +207,40 @@ describe('normalizeFileMapPropsFromJson', () => {
     ]);
     expect(result.fileList[0].name).toBe('test.pdf');
     expect(result.fileList[0].url).toBe('http://x.com/f');
+  });
+
+  it('uses id as uuid fallback and default name when missing', () => {
+    const result = normalizeFileMapPropsFromJson([{ id: 'file-id' }]);
+    expect(result.fileList[0].uuid).toBe('file-id');
+    expect(result.fileList[0].name).toBe('file-0');
+  });
+
+  it('preserves upload error status and message', () => {
+    const result = normalizeFileMapPropsFromJson([
+      {
+        name: 'bad.zip',
+        status: 'error',
+        errorMessage: 'upload failed',
+      },
+    ]);
+    expect(result.fileList[0].status).toBe('error');
+    expect(result.fileList[0].errorMessage).toBe('upload failed');
+  });
+
+  it('filters entries when normalizeFile returns null', () => {
+    const result = normalizeFileMapPropsFromJson(
+      [{ name: 'skip.ts' }, { name: 'keep.ts' }],
+      (_raw, file) => (file.name === 'skip.ts' ? null : file),
+    );
+    expect(result.fileList).toHaveLength(1);
+    expect(result.fileList[0].name).toBe('keep.ts');
+  });
+
+  it('applies className from root object', () => {
+    const result = normalizeFileMapPropsFromJson({
+      files: [{ name: 'a.ts' }],
+      className: 'file-map-custom',
+    });
+    expect(result.className).toBe('file-map-custom');
   });
 });
