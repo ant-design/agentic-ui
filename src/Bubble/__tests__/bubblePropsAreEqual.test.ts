@@ -235,6 +235,161 @@ describe('bubblePropsAreEqual', () => {
     };
     expect(bubblePropsAreEqual(a, b)).toBe(true);
   });
+
+  it('returns false when scalar Bubble props change', () => {
+    const base: BubbleProps = { id: 'm1', originData: baseOrigin() };
+    expect(
+      bubblePropsAreEqual(base, { ...base, placement: 'right' }),
+    ).toBe(false);
+    expect(bubblePropsAreEqual(base, { ...base, pure: true })).toBe(false);
+    expect(bubblePropsAreEqual(base, { ...base, readonly: true })).toBe(false);
+    expect(bubblePropsAreEqual(base, { ...base, shouldShowCopy: true })).toBe(
+      false,
+    );
+  });
+
+  it('returns false when avatar content differs', () => {
+    const a: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      avatar: { src: 'a.png' },
+    };
+    const b: BubbleProps = {
+      ...a,
+      avatar: { src: 'b.png' },
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(false);
+  });
+
+  it('returns false when inline style values differ', () => {
+    const a: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      style: { margin: 1 },
+    };
+    const b: BubbleProps = {
+      ...a,
+      style: { margin: 2 },
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(false);
+  });
+
+  it('returns false when nested styles differ', () => {
+    const a: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      styles: { bubble: { color: 'red' } },
+    };
+    const b: BubbleProps = {
+      ...a,
+      styles: { bubble: { color: 'blue' } },
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(false);
+  });
+
+  it('returns false when userBubbleProps or aIBubbleProps change', () => {
+    const base: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      userBubbleProps: { pure: false },
+      aIBubbleProps: { readonly: false },
+    };
+    expect(
+      bubblePropsAreEqual(base, {
+        ...base,
+        userBubbleProps: { pure: true },
+      }),
+    ).toBe(false);
+    expect(
+      bubblePropsAreEqual(base, {
+        ...base,
+        aIBubbleProps: { readonly: true },
+      }),
+    ).toBe(false);
+  });
+
+  it('returns false when config refs or fileView props change', () => {
+    const base: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      bubbleRenderConfig: { a: 1 },
+      docListProps: { b: 1 },
+      customConfig: { c: 1 },
+      fileViewConfig: { d: 1 },
+    };
+    expect(
+      bubblePropsAreEqual(base, {
+        ...base,
+        bubbleRenderConfig: { a: 2 },
+      }),
+    ).toBe(false);
+    expect(
+      bubblePropsAreEqual(base, {
+        ...base,
+        docListProps: { b: 2 },
+      }),
+    ).toBe(false);
+    expect(
+      bubblePropsAreEqual(base, {
+        ...base,
+        customConfig: { c: 2 },
+      }),
+    ).toBe(false);
+    expect(
+      bubblePropsAreEqual(base, {
+        ...base,
+        fileViewConfig: { d: 2 },
+      }),
+    ).toBe(false);
+  });
+
+  it('returns false when originData scalar fields change', () => {
+    const base: BubbleProps = { id: 'm1', originData: baseOrigin() };
+    expect(
+      bubblePropsAreEqual(base, {
+        ...base,
+        originData: { ...baseOrigin(), isAborted: true },
+      }),
+    ).toBe(false);
+    expect(
+      bubblePropsAreEqual(base, {
+        ...base,
+        originData: { ...baseOrigin(), feedback: 'like' as const },
+      }),
+    ).toBe(false);
+    expect(
+      bubblePropsAreEqual(base, {
+        ...base,
+        originData: { ...baseOrigin(), error: new Error('x') },
+      }),
+    ).toBe(false);
+  });
+
+  it('ignores meta fields that do not affect bubble rendering', () => {
+    const a: BubbleProps = {
+      id: 'm1',
+      originData: { ...baseOrigin(), meta: { customOnly: 'a' } },
+    };
+    const b: BubbleProps = {
+      id: 'm1',
+      originData: { ...baseOrigin(), meta: { customOnly: 'b' } },
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(true);
+  });
+
+  it('treats equal deps arrays as equal', () => {
+    const dep = { k: 1 };
+    const a: BubbleProps & { deps?: unknown[] } = {
+      id: 'm1',
+      originData: baseOrigin(),
+      deps: [dep],
+    };
+    const b: BubbleProps & { deps?: unknown[] } = {
+      ...a,
+      deps: [dep],
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(true);
+  });
 });
 
 describe('shallowEqualRecord', () => {
@@ -260,5 +415,11 @@ describe('shallowEqualStyles', () => {
         { bubble: { color: 'blue' } },
       ),
     ).toBe(false);
+  });
+
+  it('treats nullish sides as equal', () => {
+    expect(shallowEqualStyles(undefined, undefined)).toBe(true);
+    expect(shallowEqualStyles(null, undefined)).toBe(true);
+    expect(shallowEqualStyles({ a: 1 }, undefined)).toBe(false);
   });
 });
