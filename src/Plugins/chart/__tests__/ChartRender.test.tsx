@@ -165,6 +165,33 @@ vi.mock('../loadChartRuntime', () => ({
   })),
 }));
 
+vi.mock('../DocCards', () => ({
+  DocCards: vi.fn(({ title, toolbar, cardColumns, fieldMap, data }) => (
+    <div data-testid="doc-cards">
+      <span data-testid="doc-cards-title">{title}</span>
+      {toolbar}
+      {typeof cardColumns === 'number' && (
+        <span data-testid="doc-cards-columns">{cardColumns}</span>
+      )}
+      {fieldMap && (
+        <span data-testid="doc-cards-field-map">{JSON.stringify(fieldMap)}</span>
+      )}
+      <span data-testid="doc-cards-data">{JSON.stringify(data)}</span>
+    </div>
+  )),
+}));
+
+vi.mock('../QuadrantChart', () => ({
+  QuadrantChart: vi.fn(({ title, toolbar, columns, data }) => (
+    <div data-testid="quadrant-chart">
+      <span data-testid="quadrant-title">{title}</span>
+      {toolbar}
+      <span data-testid="quadrant-columns">{JSON.stringify(columns)}</span>
+      <span data-testid="quadrant-data">{JSON.stringify(data)}</span>
+    </div>
+  )),
+}));
+
 describe('ChartRender', () => {
   const defaultProps = {
     chartType: 'bar' as const,
@@ -1327,6 +1354,90 @@ describe('ChartRender', () => {
       // 应该只渲染有效的列（限定在 Descriptions 组件内，避免工具栏配置表单干扰）
       expect(within(descriptionView as HTMLElement).getByText('Name')).toBeInTheDocument();
       expect(within(descriptionView as HTMLElement).getByText('Valid')).toBeInTheDocument();
+    });
+  });
+
+  describe('DocCards 与 Quadrant 渲染', () => {
+    it('应该渲染 docCards 并传递 cardColumns、fieldMap 与 toolbar', () => {
+      const props = {
+        ...defaultProps,
+        chartType: 'docCards' as const,
+        chartData: [{ title: 'Doc 1', summary: 'Summary' }],
+        config: {
+          ...defaultProps.config,
+          rest: {
+            cardColumns: 2,
+            fieldMap: { title: 'title', summary: 'summary' },
+          },
+        },
+        title: 'Doc Cards Title',
+      };
+
+      const { container } = render(
+        <I18nContext.Provider value={mockI18n}>
+          <ChartRender {...props} />
+        </I18nContext.Provider>,
+      );
+
+      expect(screen.getByTestId('doc-cards')).toBeInTheDocument();
+      expect(screen.getByTestId('doc-cards-title')).toHaveTextContent(
+        'Doc Cards Title',
+      );
+      expect(screen.getByTestId('doc-cards-columns')).toHaveTextContent('2');
+      expect(screen.getByTestId('doc-cards-field-map')).toHaveTextContent(
+        'title',
+      );
+      expect(
+        container.querySelector('.ant-agentic-plugin-chart__doc-cards'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '配置图表' })).toBeInTheDocument();
+    });
+
+    it('应该渲染 docCards 且 rest 缺省时仍正常展示', () => {
+      const props = {
+        ...defaultProps,
+        chartType: 'docCards' as const,
+        chartData: [{ name: 'Only field' }],
+        config: {
+          ...defaultProps.config,
+          rest: {},
+        },
+        title: 'Minimal Doc Cards',
+      };
+
+      render(
+        <I18nContext.Provider value={mockI18n}>
+          <ChartRender {...props} />
+        </I18nContext.Provider>,
+      );
+
+      expect(screen.getByTestId('doc-cards')).toBeInTheDocument();
+      expect(screen.queryByTestId('doc-cards-columns')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('doc-cards-field-map')).not.toBeInTheDocument();
+    });
+
+    it('应该渲染 quadrant 图表并传递 columns 与 toolbar', () => {
+      const props = {
+        ...defaultProps,
+        chartType: 'quadrant' as const,
+        chartData: [{ name: 'A', x: 1, y: 2 }],
+        title: 'Quadrant Title',
+      };
+
+      const { container } = render(
+        <I18nContext.Provider value={mockI18n}>
+          <ChartRender {...props} />
+        </I18nContext.Provider>,
+      );
+
+      expect(screen.getByTestId('quadrant-chart')).toBeInTheDocument();
+      expect(screen.getByTestId('quadrant-title')).toHaveTextContent(
+        'Quadrant Title',
+      );
+      expect(
+        container.querySelector('.ant-agentic-plugin-chart__quadrant-chart'),
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '配置图表' })).toBeInTheDocument();
     });
   });
 });
