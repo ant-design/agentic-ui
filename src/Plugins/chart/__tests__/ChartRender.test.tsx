@@ -1174,6 +1174,37 @@ describe('ChartRender', () => {
       expect(onColumnLengthChange).toHaveBeenCalledWith(2);
     });
 
+    it('列数 Dropdown 1–4 菜单项均应触发 onColumnLengthChange', async () => {
+      const onColumnLengthChange = vi.fn();
+      const props = {
+        ...defaultProps,
+        isChartList: true,
+        columnLength: 2,
+        onColumnLengthChange,
+      };
+
+      render(
+        <I18nContext.Provider value={mockI18n}>
+          <ChartRender {...props} />
+        </I18nContext.Provider>,
+      );
+
+      for (const columnCount of [1, 2, 3, 4]) {
+        onColumnLengthChange.mockClear();
+        const menuItems = document.body.querySelectorAll(
+          '.ant-dropdown-menu-item',
+        );
+        const option = Array.from(menuItems).find(
+          (item) => item.textContent === String(columnCount),
+        );
+        expect(option).toBeTruthy();
+        await act(async () => {
+          fireEvent.click(option as HTMLElement);
+        });
+        expect(onColumnLengthChange).toHaveBeenCalledWith(columnCount);
+      }
+    });
+
     it('应该复制表格 Markdown 并提示成功', async () => {
       const successSpy = vi
         .spyOn(message, 'success')

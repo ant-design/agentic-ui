@@ -252,6 +252,47 @@ describe('PureBubble', () => {
     );
 
     expect(screen.getByText('Test message content')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-before')).not.toBeInTheDocument();
+  });
+
+  it('should render contentBeforeRender output inside message-before', () => {
+    render(
+      <BubbleConfigProvide>
+        <PureBubble
+          {...defaultProps}
+          bubbleRenderConfig={{
+            contentBeforeRender: () => (
+              <div data-testid="custom-before">Before content</div>
+            ),
+          }}
+        />
+      </BubbleConfigProvide>,
+    );
+
+    expect(screen.getByTestId('message-before')).toBeInTheDocument();
+    expect(screen.getByTestId('custom-before')).toBeInTheDocument();
+  });
+
+  it('should render custom header with right placement via bubbleRenderConfig.render', () => {
+    render(
+      <BubbleConfigProvide>
+        <PureBubble
+          {...defaultProps}
+          placement="right"
+          bubbleRenderConfig={{
+            render: (_props, slots) => (
+              <div data-testid="custom-layout">
+                {slots.header}
+                {slots.messageContent}
+              </div>
+            ),
+          }}
+        />
+      </BubbleConfigProvide>,
+    );
+
+    expect(screen.getByTestId('custom-layout')).toBeInTheDocument();
+    expect(screen.getByText('Test message content')).toBeInTheDocument();
   });
 
   it('should render contentAfterDom as null by default', () => {
