@@ -12,6 +12,32 @@ vi.mock('../../../Hooks/useRefFunction', () => ({
   useRefFunction: (fn: any) => fn,
 }));
 
+const focusMock = vi.fn();
+const isFocusedMock = vi.fn(() => false);
+const selectMock = vi.fn();
+const endMock = vi.fn(() => ({ path: [0, 0], offset: 0 }));
+
+vi.mock('slate-react', () => ({
+  ReactEditor: {
+    isFocused: (...args: unknown[]) => isFocusedMock(...args),
+  },
+}));
+
+vi.mock('../../../MarkdownEditor/editor/utils/editorUtils', () => ({
+  EditorUtils: {
+    focus: (...args: unknown[]) => focusMock(...args),
+  },
+}));
+
+vi.mock('slate', () => ({
+  Editor: {
+    end: (...args: unknown[]) => endMock(...args),
+  },
+  Transforms: {
+    select: (...args: unknown[]) => selectMock(...args),
+  },
+}));
+
 function createDefaultParams(overrides: Record<string, any> = {}) {
   const inputRef = { current: document.createElement('div') };
   const markdownEditorRef = {
@@ -36,6 +62,7 @@ function createDefaultParams(overrides: Record<string, any> = {}) {
 describe('useEnlargeAndContainerHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    isFocusedMock.mockReturnValue(false);
   });
 
   describe('handleEnlargeClick', () => {
@@ -103,6 +130,64 @@ describe('useEnlargeAndContainerHandler', () => {
       );
       const e = { target: document.createElement('div') } as any;
       expect(() => result.current.handleContainerClick(e)).not.toThrow();
+    });
+
+    it('无 editor 时不聚焦', () => {
+      const params = createDefaultParams();
+      const { result } = renderHook(() =>
+        useEnlargeAndContainerHandler(params),
+      );
+      result.current.handleContainerClick({
+        target: document.createElement('div'),
+      } as any);
+      expect(focusMock).not.toHaveBeenCalled();
+    });
+
+    it('点击交互元素时不聚焦', () => {
+      const editor = {} as any;
+      const params = createDefaultParams();
+      params.markdownEditorRef.current.markdownEditorRef.current = editor;
+      const { result } = renderHook(() =>
+        useEnlargeAndContainerHandler(params),
+      );
+      const button = document.createElement('button');
+      const wrapper = document.createElement('div');
+      wrapper.appendChild(button);
+
+      result.current.handleContainerClick({ target: button } as any);
+      expect(focusMock).not.toHaveBeenCalled();
+    });
+
+    it('编辑器已聚焦时不重复聚焦', () => {
+      isFocusedMock.mockReturnValue(true);
+      const editor = {} as any;
+      const params = createDefaultParams();
+      params.markdownEditorRef.current.markdownEditorRef.current = editor;
+      const { result } = renderHook(() =>
+        useEnlargeAndContainerHandler(params),
+      );
+
+      result.current.handleContainerClick({
+        target: document.createElement('div'),
+      } as any);
+      expect(focusMock).not.toHaveBeenCalled();
+    });
+
+    it('点击空白区域时聚焦并选中末尾', () => {
+      const editor = {} as any;
+      const params = createDefaultParams();
+      params.markdownEditorRef.current.markdownEditorRef.current = editor;
+      const { result } = renderHook(() =>
+        useEnlargeAndContainerHandler(params),
+      );
+
+      result.current.handleContainerClick({
+        target: document.createElement('div'),
+      } as any);
+
+      expect(focusMock).toHaveBeenCalledWith(editor);
+      expect(endMock).toHaveBeenCalledWith(editor, []);
+      expect(selectMock).toHaveBeenCalled();
     });
   });
 });
