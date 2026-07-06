@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type React from 'react';
 import {
   bubblePropsAreEqual,
   shallowEqualRecord,
@@ -377,6 +378,52 @@ describe('bubblePropsAreEqual', () => {
     expect(bubblePropsAreEqual(a, b)).toBe(true);
   });
 
+  it('returns false when one side metadata is missing', () => {
+    const a: BubbleProps = {
+      id: 'm1',
+      originData: {
+        ...baseOrigin(),
+        meta: { title: 'T', metadata: { k: 1 } },
+      },
+    };
+    const b: BubbleProps = {
+      id: 'm1',
+      originData: {
+        ...baseOrigin(),
+        meta: { title: 'T' },
+      },
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(false);
+  });
+
+  it('returns false when shallowEqualConfigObject keys differ', () => {
+    const a: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      customConfig: { onlyA: 1 },
+    };
+    const b: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      customConfig: { onlyB: 1 },
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(false);
+  });
+
+  it('returns false when config nested value is an array', () => {
+    const a: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      customConfig: { tags: ['a'] },
+    };
+    const b: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      customConfig: { tags: ['b'] },
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(false);
+  });
+
   it('treats equal deps arrays as equal', () => {
     const dep = { k: 1 };
     const a: BubbleProps & { deps?: unknown[] } = {
@@ -421,5 +468,29 @@ describe('shallowEqualStyles', () => {
     expect(shallowEqualStyles(undefined, undefined)).toBe(true);
     expect(shallowEqualStyles(null, undefined)).toBe(true);
     expect(shallowEqualStyles({ a: 1 }, undefined)).toBe(false);
+  });
+
+  it('returns false when style slot values are arrays', () => {
+    expect(
+      shallowEqualStyles(
+        { bubble: ['a'] as unknown as React.CSSProperties },
+        { bubble: ['b'] as unknown as React.CSSProperties },
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('shallowEqualClassNames via bubblePropsAreEqual', () => {
+  it('treats equal classNames maps as equal across new object refs', () => {
+    const a: BubbleProps = {
+      id: 'm1',
+      originData: baseOrigin(),
+      classNames: { bubble: 'x', content: 'y' },
+    };
+    const b: BubbleProps = {
+      ...a,
+      classNames: { bubble: 'x', content: 'y' },
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(true);
   });
 });
