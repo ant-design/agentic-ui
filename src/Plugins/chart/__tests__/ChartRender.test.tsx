@@ -647,20 +647,57 @@ describe('ChartRender', () => {
       expect(container.firstChild).toBeInTheDocument();
     });
 
-    it('应该处理没有列数变化回调的情况', () => {
-      const props = { ...defaultProps, onColumnLengthChange: undefined };
-      const { container } = render(
+    it('应该处理没有列数变化回调的情况', async () => {
+      const props = {
+        ...defaultProps,
+        isChartList: true,
+        columnLength: 3,
+        onColumnLengthChange: undefined,
+      };
+
+      render(
         <I18nContext.Provider value={mockI18n}>
           <ChartRender {...props} />
         </I18nContext.Provider>,
       );
 
-      // 检查组件是否渲染了基本结构
-      expect(container.firstChild).toBeInTheDocument();
+      const menuItems = document.body.querySelectorAll('.ant-dropdown-menu-item');
+      const columnOption = Array.from(menuItems).find(
+        (item) => item.textContent === '2',
+      );
+      expect(columnOption).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.click(columnOption as HTMLElement);
+      });
     });
   });
 
   describe('图表类型切换测试', () => {
+    it('应该通过类型 Dropdown 菜单切换 chartType', async () => {
+      renderChart(
+        <I18nContext.Provider value={mockI18n}>
+          <ChartRender {...defaultProps} />
+        </I18nContext.Provider>,
+      );
+
+      await screen.findByTestId('bar-chart', {}, { timeout: 3000 });
+
+      const menuItems = document.body.querySelectorAll('.ant-dropdown-menu-item');
+      const lineOption = Array.from(menuItems).find(
+        (item) => item.textContent === '折线图',
+      );
+      expect(lineOption).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.click(lineOption as HTMLElement);
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('line-chart')).toBeInTheDocument();
+      });
+    });
+
     it('应该支持图表类型切换', () => {
       const { container } = render(
         <I18nContext.Provider value={mockI18n}>
