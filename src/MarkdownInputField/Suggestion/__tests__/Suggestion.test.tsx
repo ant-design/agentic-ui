@@ -119,4 +119,178 @@ describe('Suggestion', () => {
     expect(onOpenChange).toHaveBeenCalled();
     expect(onOpenChange.mock.calls.at(-1)?.[0]).toBe(false);
   });
+
+  it('loads async items when items is a function', async () => {
+    const items = vi.fn().mockResolvedValue([
+      { key: 'async', label: 'Async item' },
+    ]);
+
+    render(
+      <Suggestion tagInputProps={{ items, open: true }}>
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    await waitFor(() => {
+      expect(items).toHaveBeenCalled();
+      expect(screen.getByTestId('suggestion-item-async')).toBeInTheDocument();
+    });
+  });
+
+  it('uses dropdownRender wrapper when provided', async () => {
+    const dropdownRender = vi.fn((content: React.ReactNode) => (
+      <div data-testid="custom-dropdown">{content}</div>
+    ));
+
+    render(
+      <Suggestion
+        tagInputProps={{
+          items: [{ key: 'x', label: 'X' }],
+          dropdownRender,
+          open: true,
+        }}
+      >
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('custom-dropdown')).toBeInTheDocument();
+    });
+    expect(dropdownRender).toHaveBeenCalled();
+  });
+
+  it('logs warning when async items loader rejects', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const items = vi.fn().mockRejectedValue(new Error('load failed'));
+
+    render(
+      <Suggestion tagInputProps={{ items, open: true }}>
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    await waitFor(() => {
+      expect(items).toHaveBeenCalled();
+    });
+    expect(warn).toHaveBeenCalledWith(
+      '[Suggestion] items() loading failed:',
+      expect.any(Error),
+    );
+    warn.mockRestore();
+  });
+
+  it('stops keydown propagation on default menu items', () => {
+    render(
+      <Suggestion
+        tagInputProps={{
+          items: [{ key: 'a', label: 'Alpha' }],
+          open: true,
+        }}
+      >
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    const stopPropagation = vi.fn();
+    const preventDefault = vi.fn();
+    getLastDropdownProps().menu.onKeyDown({
+      stopPropagation,
+      preventDefault,
+    } as any);
+
+    expect(stopPropagation).toHaveBeenCalled();
+    expect(preventDefault).toHaveBeenCalled();
+  });
+
+  it('invokes onSelect from dropdownRender props and closes', async () => {
+    const onSelect = vi.fn();
+    let dropdownProps: Record<string, any> | undefined;
+    const dropdownRender = vi.fn(
+      (_content: React.ReactNode, props: Record<string, any>) => {
+        dropdownProps = props;
+        return <div data-testid="custom-dropdown">{_content}</div>;
+      },
+    );
+
+    render(
+      <Suggestion
+        tagInputProps={{
+          items: [{ key: 'x', label: 'X' }],
+          dropdownRender,
+          open: true,
+        }}
+      >
+        <SelectBinder onSelect={onSelect} />
+      </Suggestion>,
+    );
+
+    await waitFor(() => {
+      expect(dropdownRender).toHaveBeenCalled();
+    });
+
+    dropdownProps!.onSelect('custom-value', [2]);
+    expect(onSelect).toHaveBeenCalledWith('custom-value', [2]);
+  });
+
+  it('ignores non-array async items results', async () => {
+    const items = vi.fn().mockResolvedValue(null as any);
+
+    render(
+      <Suggestion tagInputProps={{ items, open: true }}>
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    await waitFor(() => {
+      expect(items).toHaveBeenCalled();
+    });
+    expect(getLastDropdownProps().menu.items).toEqual([]);
+  });
+
+  it('returns empty string when menu and items exist without notFoundContent', () => {
+    render(
+      <Suggestion
+        tagInputProps={{
+          menu: { items: [] },
+          items: [],
+          open: true,
+        }}
+      >
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    expect(screen.getByTestId('popup').textContent).toBe('');
+  });
+
+  it('updates selected items when static items array changes', async () => {
+    const { rerender } = render(
+      <Suggestion
+        tagInputProps={{
+          items: [{ key: 'a', label: 'Alpha' }],
+          open: true,
+        }}
+      >
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    expect(screen.getByTestId('suggestion-item-a')).toBeInTheDocument();
+
+    rerender(
+      <Suggestion
+        tagInputProps={{
+          items: [{ key: 'b', label: 'Beta' }],
+          open: true,
+        }}
+      >
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('suggestion-item-b')).toBeInTheDocument();
+    });
+  });
 });

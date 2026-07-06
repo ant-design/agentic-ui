@@ -116,6 +116,26 @@ describe('unwrapList', () => {
     expect(unwrapList(editor, agenticListsSchema)).toBe(true);
     expect((editor.children[0] as { type: string }).type).toBe('paragraph');
   });
+
+  it('returns false when selection has no list items', () => {
+    const editor = withAgenticLists(createEditor());
+    editor.children = [{ type: 'paragraph', children: [{ text: 'plain' }] }];
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 0 },
+      focus: { path: [0, 0], offset: 5 },
+    };
+
+    expect(unwrapList(editor, agenticListsSchema)).toBe(false);
+  });
+
+  it('supports point selection when unwrapping a single item', () => {
+    const editor = withAgenticLists(createEditor());
+    editor.children = structuredClone(bulletedList(['solo']));
+    const point = { path: [0, 0, 0, 0], offset: 2 };
+    editor.selection = { anchor: point, focus: point };
+
+    expect(unwrapList(editor, agenticListsSchema, point)).toBe(true);
+  });
 });
 
 describe('decreaseDepth', () => {

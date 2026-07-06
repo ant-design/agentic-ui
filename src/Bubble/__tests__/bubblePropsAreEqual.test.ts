@@ -396,6 +396,24 @@ describe('bubblePropsAreEqual', () => {
     expect(bubblePropsAreEqual(a, b)).toBe(false);
   });
 
+  it('returns false when metadata values differ', () => {
+    const a: BubbleProps = {
+      id: 'm1',
+      originData: {
+        ...baseOrigin(),
+        meta: { title: 'T', metadata: { k: 1 } },
+      },
+    };
+    const b: BubbleProps = {
+      id: 'm1',
+      originData: {
+        ...baseOrigin(),
+        meta: { title: 'T', metadata: { k: 2 } },
+      },
+    };
+    expect(bubblePropsAreEqual(a, b)).toBe(false);
+  });
+
   it('returns false when shallowEqualConfigObject keys differ', () => {
     const a: BubbleProps = {
       id: 'm1',

@@ -86,6 +86,14 @@ describe('parseCode handleCode', () => {
     );
     expect(result.otherProps).toMatchObject({ keep: 1, fromConfig: 2 });
   });
+
+  it('should assign config-only otherProps for plain code blocks', () => {
+    const result = handleCode(
+      { value: 'plain\n', lang: 'text', meta: undefined },
+      { stream: true },
+    );
+    expect(result.otherProps).toMatchObject({ stream: true });
+  });
 });
 
 describe('parseCode agentic-ui embed blocks', () => {
