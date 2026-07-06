@@ -1184,9 +1184,13 @@ describe('ChartRender', () => {
 
       const xSelects = document.body.querySelectorAll('.ant-select-selector');
       if (xSelects.length >= 1) {
+        const stopX = vi.fn();
+        fireEvent.click(xSelects[0], { stopPropagation: stopX });
         fireEvent.mouseDown(xSelects[0]);
       }
       if (xSelects.length >= 2) {
+        const stopY = vi.fn();
+        fireEvent.click(xSelects[1], { stopPropagation: stopY });
         fireEvent.mouseDown(xSelects[1]);
       }
 
