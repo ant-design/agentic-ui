@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, message } from 'antd';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { I18nContext } from '../../../I18n';
@@ -17,6 +17,29 @@ vi.mock('antd', async (importOriginal) => {
   const React = await import('react');
   return {
     ...actual,
+    Dropdown: ({
+      menu,
+      children,
+    }: {
+      menu?: { items?: Array<{ key: React.Key; label: React.ReactNode; onClick?: () => void }> };
+      children?: React.ReactNode;
+    }) => (
+      <div data-testid="chart-dropdown">
+        {children}
+        <div className="ant-dropdown-menu">
+          {menu?.items?.map((item) => (
+            <button
+              key={String(item.key)}
+              type="button"
+              className="ant-dropdown-menu-item"
+              onClick={() => item.onClick?.()}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    ),
     Popover: ({
       content,
       children,
@@ -32,7 +55,12 @@ vi.mock('antd', async (importOriginal) => {
   };
 });
 
+vi.mock('copy-to-clipboard', () => ({
+  default: vi.fn(() => true),
+}));
+
 import { ChartRender } from '../ChartRender';
+import copy from 'copy-to-clipboard';
 
 vi.mock('../../../Hooks/useIntersectionOnce', () => ({
   useIntersectionOnce: () => true,
@@ -1133,12 +1161,42 @@ describe('ChartRender', () => {
       const menuItems = document.body.querySelectorAll(
         '.ant-dropdown-menu-item',
       );
-      if (menuItems.length > 0) {
-        await act(async () => {
-          fireEvent.click(menuItems[1]);
-        });
-        expect(onColumnLengthChange).toHaveBeenCalledWith(2);
-      }
+      expect(menuItems.length).toBeGreaterThan(0);
+
+      const columnOption = Array.from(menuItems).find(
+        (item) => item.textContent === '2',
+      );
+      expect(columnOption).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.click(columnOption as HTMLElement);
+      });
+      expect(onColumnLengthChange).toHaveBeenCalledWith(2);
+    });
+
+    it('应该复制表格 Markdown 并提示成功', async () => {
+      const successSpy = vi
+        .spyOn(message, 'success')
+        .mockImplementation(() => undefined as any);
+
+      renderChart(
+        <I18nContext.Provider value={mockI18n}>
+          <ChartRender {...defaultProps} />
+        </I18nContext.Provider>,
+      );
+
+      await screen.findByTestId('bar-chart', {}, { timeout: 3000 });
+
+      const copyIcon = document.querySelector('.anticon-copy');
+      expect(copyIcon).toBeTruthy();
+
+      await act(async () => {
+        fireEvent.click(copyIcon as Element);
+      });
+
+      expect(vi.mocked(copy)).toHaveBeenCalled();
+      expect(successSpy).toHaveBeenCalled();
+      successSpy.mockRestore();
     });
   });
 
