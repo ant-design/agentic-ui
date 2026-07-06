@@ -293,4 +293,57 @@ describe('Suggestion', () => {
       expect(screen.getByTestId('suggestion-item-b')).toBeInTheDocument();
     });
   });
+
+  it('handles Dropdown onOpenChange open vs close branches', async () => {
+    render(
+      <Suggestion tagInputProps={{ items: [{ key: 'a', label: 'Alpha' }] }}>
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    getLastDropdownProps().onOpenChange(true);
+    expect(getLastDropdownProps().open).toBe(false);
+
+    getLastDropdownProps().onOpenChange(false);
+
+    await waitFor(() => {
+      expect(getLastDropdownProps().open).toBe(false);
+    });
+  });
+
+  it('stops keydown propagation on dropdownRender wrapper', async () => {
+    const dropdownRender = vi.fn((content: React.ReactNode) => (
+      <div data-testid="custom-dropdown">{content}</div>
+    ));
+
+    render(
+      <Suggestion
+        tagInputProps={{
+          items: [{ key: 'x', label: 'X' }],
+          dropdownRender,
+          open: true,
+        }}
+      >
+        <button type="button">Trigger</button>
+      </Suggestion>,
+    );
+
+    await waitFor(() => {
+      expect(dropdownRender).toHaveBeenCalled();
+    });
+
+    const wrapper = screen.getByTestId('popup').firstElementChild as HTMLElement;
+    const event = new KeyboardEvent('keydown', {
+      bubbles: true,
+      cancelable: true,
+      key: 'Enter',
+    });
+    const stopPropagation = vi.spyOn(event, 'stopPropagation');
+    const preventDefault = vi.spyOn(event, 'preventDefault');
+
+    wrapper.dispatchEvent(event);
+
+    expect(stopPropagation).toHaveBeenCalled();
+    expect(preventDefault).toHaveBeenCalled();
+  });
 });
