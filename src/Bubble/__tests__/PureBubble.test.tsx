@@ -110,6 +110,49 @@ describe('PureBubble', () => {
     expect(screen.getByText('Test message content')).toBeInTheDocument();
   });
 
+  it('should fall back when BubbleConfigContext is missing', () => {
+    render(
+      <ConfigProvider>
+        <PureBubble {...defaultProps} />
+      </ConfigProvider>,
+    );
+
+    expect(screen.getByText('Test message content')).toBeInTheDocument();
+  });
+
+  it('should treat non-string originData.content as empty markdown', () => {
+    render(
+      <BubbleConfigProvide>
+        <PureBubble
+          {...defaultProps}
+          originData={{
+            ...defaultProps.originData,
+            content: { blocks: [] } as unknown as string,
+          }}
+        />
+      </BubbleConfigProvide>,
+    );
+
+    expect(screen.queryByText('Test message content')).not.toBeInTheDocument();
+  });
+
+  it('should prefer originData.createAt over props.time', () => {
+    render(
+      <BubbleConfigProvide>
+        <PureBubble
+          {...defaultProps}
+          time={1}
+          originData={{
+            ...defaultProps.originData,
+            createAt: 999999,
+          }}
+        />
+      </BubbleConfigProvide>,
+    );
+
+    expect(screen.getByText('Test message content')).toBeInTheDocument();
+  });
+
   it('should get prefix class', () => {
     render(
       <BubbleConfigProvide>
