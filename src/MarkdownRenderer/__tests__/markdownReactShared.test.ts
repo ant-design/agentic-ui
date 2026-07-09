@@ -17,6 +17,14 @@ describe('splitMarkdownBlocks', () => {
     expect(result[1]).toBe('block2');
   });
 
+  it('keeps GFM footnote definition with preceding content', () => {
+    const md = 'Paragraph with ref[^1].\n\n[^1]: Footnote body here';
+    const result = splitMarkdownBlocks(md);
+
+    expect(result.length).toBe(1);
+    expect(result[0]).toBe(md);
+  });
+
   it('splits on double blank lines', () => {
     const md = 'block1\n\n\nblock2';
     const result = splitMarkdownBlocks(md);
