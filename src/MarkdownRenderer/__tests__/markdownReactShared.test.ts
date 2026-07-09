@@ -175,6 +175,16 @@ describe('splitMarkdownBlocks', () => {
     expect(result[1]).toBe('Response text.');
   });
 
+  it('splits preceding prose before inline think tag pair', () => {
+    const md = 'Intro paragraph.\n\n<think>inline thinking</think>\n\nAnswer.';
+    const result = splitMarkdownBlocks(md);
+    expect(result).toEqual([
+      'Intro paragraph.',
+      '<think>inline thinking</think>',
+      'Answer.',
+    ]);
+  });
+
   it('handles think open tag with inline content', () => {
     const md =
       '<think>thinking starts here\n\ncontinues\n</think>\n\nResponse.';
@@ -184,6 +194,17 @@ describe('splitMarkdownBlocks', () => {
       '<think>thinking starts here\n\ncontinues\n</think>',
     );
     expect(result[1]).toBe('Response.');
+  });
+
+  it('splits preceding prose before think open tag with inline content', () => {
+    const md =
+      'Intro paragraph.\n\n<think>thinking starts here\n\ncontinues\n</think>\n\nAnswer.';
+    const result = splitMarkdownBlocks(md);
+    expect(result).toEqual([
+      'Intro paragraph.',
+      '<think>thinking starts here\n\ncontinues\n</think>',
+      'Answer.',
+    ]);
   });
 
   it('handles unclosed think tag (streaming mid-output)', () => {
