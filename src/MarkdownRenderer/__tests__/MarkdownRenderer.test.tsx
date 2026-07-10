@@ -461,12 +461,12 @@ describe('MarkdownRenderer', () => {
     expect(thinkBlocks[1]?.textContent).toContain('第二轮思考');
     expect(thinkBlocks[1]?.textContent).not.toContain('最终回答');
 
-    const finalParagraph = Array.from(container.querySelectorAll('p')).find(
-      (element) => element.textContent?.includes('最终回答'),
-    );
-    expect(finalParagraph).toBeTruthy();
+    const finalBlock = Array.from(
+      container.querySelectorAll('[data-testid="markdown-paragraph"]'),
+    ).find((element) => element.textContent?.includes('最终回答'));
+    expect(finalBlock).toBeTruthy();
     expect(
-      thinkBlocks.some((block) => block.contains(finalParagraph as Node)),
+      thinkBlocks.some((block) => block.contains(finalBlock as Node)),
     ).toBe(false);
   });
 
