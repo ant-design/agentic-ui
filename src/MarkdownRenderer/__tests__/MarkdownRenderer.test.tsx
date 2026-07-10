@@ -440,6 +440,23 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
+  it('行内 </think> 后的正文应渲染在深度思考折叠块外', () => {
+    const finalAnswer = '最终回答必须显示在折叠外';
+    const { container } = render(
+      <MarkdownRenderer
+        content={`<think>\n思考1\n构造调用。</think>\n${finalAnswer}`}
+      />,
+    );
+
+    const thinkBlock = container.querySelector(
+      '[data-testid="think-block-renderer"]',
+    );
+    expect(thinkBlock).toBeTruthy();
+    expect(thinkBlock?.textContent).toContain('构造调用。');
+    expect(thinkBlock?.textContent).not.toContain(finalAnswer);
+    expect(container.textContent).toContain(finalAnswer);
+  });
+
   it('应将 HTML 注释 + 表格组合渲染为图表', async () => {
     const content = [
       '<!-- [{"chartType":"line","title":"趋势","x":"month","y":"value"}] -->',
