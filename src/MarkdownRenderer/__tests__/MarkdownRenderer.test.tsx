@@ -440,6 +440,36 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
+  it('连续 <think> 块后紧跟正文时不应将正文混入深度思考', () => {
+    const content = [
+      '<think>',
+      '第一轮思考',
+      '</think>',
+      '<think>',
+      '第二轮思考',
+      '</think>',
+      '最终回答：http://example.com/resource',
+    ].join('\n');
+    const { container } = render(<MarkdownRenderer content={content} />);
+
+    const thinkBlocks = Array.from(
+      container.querySelectorAll('[data-testid="think-block-renderer"]'),
+    );
+    expect(thinkBlocks).toHaveLength(2);
+    expect(thinkBlocks[0]?.textContent).toContain('第一轮思考');
+    expect(thinkBlocks[0]?.textContent).not.toContain('最终回答');
+    expect(thinkBlocks[1]?.textContent).toContain('第二轮思考');
+    expect(thinkBlocks[1]?.textContent).not.toContain('最终回答');
+
+    const finalParagraph = Array.from(container.querySelectorAll('p')).find(
+      (element) => element.textContent?.includes('最终回答'),
+    );
+    expect(finalParagraph).toBeTruthy();
+    expect(
+      thinkBlocks.some((block) => block.contains(finalParagraph as Node)),
+    ).toBe(false);
+  });
+
   it('应将 HTML 注释 + 表格组合渲染为图表', async () => {
     const content = [
       '<!-- [{"chartType":"line","title":"趋势","x":"month","y":"value"}] -->',
