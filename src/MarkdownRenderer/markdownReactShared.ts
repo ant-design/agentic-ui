@@ -729,6 +729,20 @@ const buildEditorAlignedComponents = (
   };
 };
 
+const REDACTED_THINKING_BLOCK_RE = /^\s*<redacted_thinking\b/i;
+const REDACTED_THINKING_OPEN_TAG_RE = /<redacted_thinking\b([^>]*)>/gi;
+const REDACTED_THINKING_CLOSE_TAG_RE = /<\/redacted_thinking\s*>/gi;
+
+const normalizeThinkTagAliases = (blockContent: string): string => {
+  if (!REDACTED_THINKING_BLOCK_RE.test(blockContent)) {
+    return blockContent;
+  }
+
+  return blockContent
+    .replace(REDACTED_THINKING_OPEN_TAG_RE, '<thinking$1>')
+    .replace(REDACTED_THINKING_CLOSE_TAG_RE, '</thinking>');
+};
+
 const ERROR_FALLBACK_STYLE: React.CSSProperties = {
   margin: '0.5em 0',
   padding: '0.5em 0.75em',
@@ -748,7 +762,8 @@ const renderMarkdownBlock = (
 ): React.ReactNode => {
   if (!blockContent.trim()) return null;
   try {
-    const mdast = processor.parse(blockContent);
+    const normalizedBlockContent = normalizeThinkTagAliases(blockContent);
+    const mdast = processor.parse(normalizedBlockContent);
     const hast = processor.runSync(mdast);
     return toJsxRuntime(hast as any, {
       Fragment,
