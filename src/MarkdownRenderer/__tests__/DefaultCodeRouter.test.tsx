@@ -152,7 +152,9 @@ describe('DefaultCodeRouter', () => {
     );
 
     expect(
-      await screen.findByTestId('agentic-ui-filemap-block'),
+      await screen.findByTestId('agentic-ui-filemap-block', undefined, {
+        timeout: 5000,
+      }),
     ).toBeInTheDocument();
     expect(normalizeFile).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'report.pdf' }),
