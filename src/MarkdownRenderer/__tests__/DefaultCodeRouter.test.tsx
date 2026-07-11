@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DefaultCodeRouter } from '../DefaultCodeRouter';
@@ -121,6 +121,51 @@ describe('DefaultCodeRouter', () => {
       expect.objectContaining({
         fileMapConfig,
         language: 'agentic-ui-filemap',
+      }),
+    );
+  });
+
+  it('forwards file-map config to the lazy built-in renderer', async () => {
+    const onPreview = vi.fn();
+    const normalizeFile = vi.fn((_raw, defaultFile) => ({
+      ...defaultFile,
+      name: `normalized-${defaultFile.name}`,
+    }));
+
+    render(
+      <DefaultCodeRouter
+        language="agentic-ui-filemap"
+        pluginComponents={{}}
+        fileMapConfig={{ normalizeFile, onPreview }}
+      >
+        {JSON.stringify({
+          files: [
+            {
+              id: 'report',
+              name: 'report.pdf',
+              type: 'application/pdf',
+              url: 'https://example.com/report.pdf',
+            },
+          ],
+        })}
+      </DefaultCodeRouter>,
+    );
+
+    expect(
+      await screen.findByTestId('agentic-ui-filemap-block'),
+    ).toBeInTheDocument();
+    expect(normalizeFile).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'report.pdf' }),
+      expect.objectContaining({ name: 'report.pdf', uuid: 'report' }),
+    );
+
+    fireEvent.click(screen.getByTestId('file-item'));
+
+    expect(onPreview).toHaveBeenCalledTimes(1);
+    expect(onPreview).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'normalized-report.pdf',
+        uuid: 'report',
       }),
     );
   });
