@@ -717,6 +717,7 @@ const buildEditorAlignedComponents = (
 
     think: ThinkBlockRendererComponent,
     thinking: ThinkBlockRendererComponent,
+    redacted_thinking: ThinkBlockRendererComponent,
 
     answer: (props: any) => {
       const { node: _node, children } = props;
