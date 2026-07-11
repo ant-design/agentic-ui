@@ -440,6 +440,27 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
+  it.each([
+    ['thinking', '分析代理下一步行动'],
+    ['redacted_thinking', '内部推理已脱敏'],
+  ])('应将 <%s> 别名渲染为独立的深度思考块', (tagName, thought) => {
+    const finalAnswer = '最终回答不应混入深度思考';
+    const { container } = render(
+      <MarkdownRenderer
+        content={`<${tagName}>\n${thought}\n</${tagName}>\n\n${finalAnswer}`}
+      />,
+    );
+
+    const thinkBlocks = container.querySelectorAll(
+      '[data-testid="think-block-renderer"]',
+    );
+
+    expect(thinkBlocks).toHaveLength(1);
+    expect(thinkBlocks[0]?.textContent).toContain(thought);
+    expect(thinkBlocks[0]?.textContent).not.toContain(finalAnswer);
+    expect(container.textContent).toContain(finalAnswer);
+  });
+
   it('应将 HTML 注释 + 表格组合渲染为图表', async () => {
     const content = [
       '<!-- [{"chartType":"line","title":"趋势","x":"month","y":"value"}] -->',
