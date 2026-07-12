@@ -481,6 +481,50 @@ describe('AceEditorWrapper', () => {
       }
     });
 
+    it('应该在重新渲染后调用最新的 onChange 回调', async () => {
+      const initialOnChange = vi.fn();
+      const latestOnChange = vi.fn();
+
+      const { rerender } = render(
+        <AceEditorWrapper
+          value="initial value"
+          onChange={initialOnChange}
+          readonly={false}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(mockAceEditor.on).toHaveBeenCalledWith(
+          'change',
+          expect.any(Function),
+        );
+      });
+
+      const changeHandler = mockAceEditor.on.mock.calls.find(
+        (call: any) => call[0] === 'change',
+      )?.[1];
+
+      expect(changeHandler).toBeDefined();
+
+      mockAceEditor.getValue.mockReturnValue('first value');
+      changeHandler?.();
+      expect(initialOnChange).toHaveBeenCalledWith('first value');
+
+      rerender(
+        <AceEditorWrapper
+          value="initial value"
+          onChange={latestOnChange}
+          readonly={false}
+        />,
+      );
+
+      mockAceEditor.getValue.mockReturnValue('latest value');
+      changeHandler?.();
+
+      expect(latestOnChange).toHaveBeenCalledWith('latest value');
+      expect(initialOnChange).toHaveBeenCalledTimes(1);
+    });
+
     it('应该避免重复触发相同的值', () => {
       const onChange = vi.fn();
 
