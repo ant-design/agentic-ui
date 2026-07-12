@@ -164,6 +164,24 @@ describe('DefaultCodeRouter', () => {
     );
   });
 
+  it('routes json-chart fences through the chart plugin without rewriting language', () => {
+    const ChartRenderer = createPluginComponent('plugin-chart');
+
+    render(
+      <DefaultCodeRouter
+        language="json-chart"
+        pluginComponents={{ chart: ChartRenderer }}
+      >
+        {'{"data":[]}'}
+      </DefaultCodeRouter>,
+    );
+
+    expect(screen.getByTestId('plugin-chart')).toHaveTextContent('json-chart');
+    expect(ChartRenderer.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ language: 'json-chart' }),
+    );
+  });
+
   it('shows extracted fallback text while the default code renderer is loading', () => {
     render(
       <DefaultCodeRouter language="tsx" pluginComponents={{}}>
