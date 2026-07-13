@@ -440,6 +440,24 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
+  it('不应将 </think> 后同帧到达的正文渲染进深度思考组件', () => {
+    const { container } = render(
+      <MarkdownRenderer
+        content={'<think>\n构造调用。\n</think>http://example.com/result.xlsx'}
+      />,
+    );
+
+    const thinkBlock = container.querySelector(
+      '[data-testid="think-block-renderer"]',
+    );
+    expect(thinkBlock).toBeTruthy();
+    expect(thinkBlock?.textContent).toContain('构造调用。');
+    expect(thinkBlock?.textContent).not.toContain(
+      'http://example.com/result.xlsx',
+    );
+    expect(container.textContent).toContain('http://example.com/result.xlsx');
+  });
+
   it('应将 HTML 注释 + 表格组合渲染为图表', async () => {
     const content = [
       '<!-- [{"chartType":"line","title":"趋势","x":"month","y":"value"}] -->',
