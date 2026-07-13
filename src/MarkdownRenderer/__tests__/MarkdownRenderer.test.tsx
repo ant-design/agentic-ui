@@ -440,6 +440,42 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
+  it('流式模式下连续 think 块不应吞掉最终回答', () => {
+    const content = [
+      '<think>',
+      '第一段推理',
+      '构造调用。</think>',
+      '<think>',
+      '第二段推理',
+      '回复内容。</think>',
+      'http://example.com/report.xlsx',
+    ].join('\n');
+
+    const { container } = render(
+      <MarkdownRenderer
+        content={content}
+        streaming
+        isFinished
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    const thinkBlocks = container.querySelectorAll(
+      '[data-testid="think-block-renderer"]',
+    );
+    expect(thinkBlocks).toHaveLength(2);
+    expect(thinkBlocks[0]?.textContent).toContain('第一段推理');
+    expect(thinkBlocks[1]?.textContent).toContain('第二段推理');
+
+    const finalAnswerLink = container.querySelector(
+      'a[href="http://example.com/report.xlsx"]',
+    );
+    expect(finalAnswerLink).toBeTruthy();
+    expect(finalAnswerLink?.textContent).toBe(
+      'http://example.com/report.xlsx',
+    );
+  });
+
   it('应将 HTML 注释 + 表格组合渲染为图表', async () => {
     const content = [
       '<!-- [{"chartType":"line","title":"趋势","x":"month","y":"value"}] -->',
