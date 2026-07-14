@@ -847,6 +847,57 @@ describe('Workspace Component', () => {
     ).toBeInTheDocument();
   });
 
+  it('受控从文件列表切换到文件树时应重置文件预览', async () => {
+    const onTabChange = vi.fn();
+
+    render(
+      <TestWrapper>
+        <Workspace activeTabKey="file" onTabChange={onTabChange}>
+          <Workspace.File
+            nodes={[
+              {
+                id: 'file-tree-transition-preview',
+                name: 'transition.md',
+                content: 'transition',
+                canPreview: true,
+              },
+            ]}
+            onPreview={() => (
+              <div data-testid="file-tree-transition-preview">
+                preview body
+              </div>
+            )}
+          />
+          <Workspace.FileTree
+            treeData={[{ key: 'tree-file', name: 'tree.md', isLeaf: true }]}
+            onLoadChildren={vi.fn().mockResolvedValue([])}
+          />
+        </Workspace>
+      </TestWrapper>,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '文件：transition.md' }),
+    );
+    expect(
+      await screen.findByTestId('file-tree-transition-preview'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      within(screen.getByTestId('workspace-segmented')).getByText('文件树'),
+    );
+
+    expect(onTabChange).toHaveBeenCalledWith('fileTree');
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId('file-tree-transition-preview'),
+      ).not.toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole('button', { name: '文件：transition.md' }),
+    ).toBeInTheDocument();
+  });
+
   it('preserveFilePreviewOnTabChange=true 时受控切换不重置文件预览', async () => {
     const onTabChange = vi.fn();
 
