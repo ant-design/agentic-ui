@@ -863,9 +863,7 @@ describe('Workspace Component', () => {
               },
             ]}
             onPreview={() => (
-              <div data-testid="file-tree-transition-preview">
-                preview body
-              </div>
+              <div data-testid="file-tree-transition-preview">preview body</div>
             )}
           />
           <Workspace.FileTree
