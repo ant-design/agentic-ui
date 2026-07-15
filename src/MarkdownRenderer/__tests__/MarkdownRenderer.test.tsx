@@ -440,6 +440,52 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
+  it('流式 think 闭合后应将最终链接渲染在思考块外', () => {
+    const firstThink = '<think>\n分析用户请求';
+    const { container, rerender } = render(
+      <MarkdownRenderer
+        content={firstThink}
+        streaming
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    const secondThink =
+      `${firstThink}\n准备调用工具。</think>\n` +
+      '<think>\n工具调用完成';
+    rerender(
+      <MarkdownRenderer
+        content={secondThink}
+        streaming
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    const downloadUrl = 'https://example.com/result.xlsx';
+    rerender(
+      <MarkdownRenderer
+        content={`${secondThink}\n返回下载链接。</think>\n${downloadUrl}`}
+        streaming
+        isFinished
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    const thinkBlocks = container.querySelectorAll(
+      '[data-testid="think-block-renderer"]',
+    );
+    const downloadLink = container.querySelector(
+      `a[href="${downloadUrl}"]`,
+    );
+
+    expect(thinkBlocks).toHaveLength(2);
+    expect(downloadLink).toBeTruthy();
+    thinkBlocks.forEach((thinkBlock) => {
+      expect(thinkBlock).not.toContainElement(downloadLink);
+      expect(thinkBlock).not.toHaveTextContent(downloadUrl);
+    });
+  });
+
   it('应将 HTML 注释 + 表格组合渲染为图表', async () => {
     const content = [
       '<!-- [{"chartType":"line","title":"趋势","x":"month","y":"value"}] -->',
