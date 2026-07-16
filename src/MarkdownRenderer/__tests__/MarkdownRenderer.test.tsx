@@ -440,6 +440,34 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
+  it('流式未闭合 think 内的空行不应拆散思考内容', () => {
+    const initialReasoning = '<think>\n分析请求\n\n检查数据\n\n准备回答';
+    const { container, rerender } = render(
+      <MarkdownRenderer
+        content={initialReasoning}
+        streaming
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    rerender(
+      <MarkdownRenderer
+        content={`${initialReasoning}\n\n补充验证`}
+        streaming
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    const thinkBlocks = container.querySelectorAll(
+      '[data-testid="think-block-renderer"]',
+    );
+    expect(thinkBlocks).toHaveLength(1);
+    expect(thinkBlocks[0]).toHaveTextContent('分析请求');
+    expect(thinkBlocks[0]).toHaveTextContent('检查数据');
+    expect(thinkBlocks[0]).toHaveTextContent('准备回答');
+    expect(thinkBlocks[0]).toHaveTextContent('补充验证');
+  });
+
   it('流式 think 闭合后应将最终链接渲染在思考块外', () => {
     const firstThink = '<think>\n分析用户请求';
     const { container, rerender } = render(
