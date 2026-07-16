@@ -37,6 +37,25 @@ describe('splitMarkdownBlocks', () => {
     expect(result.length).toBe(1);
   });
 
+  it('does not treat think tags inside code fences as think blocks', () => {
+    const md = [
+      '```txt',
+      '<think>',
+      'line one',
+      '',
+      'line two',
+      '</think>',
+      '```',
+      '',
+      'Answer paragraph.',
+    ].join('\n');
+
+    expect(splitMarkdownBlocks(md)).toEqual([
+      '```txt\n<think>\nline one\n\nline two\n</think>\n```',
+      'Answer paragraph.',
+    ]);
+  });
+
   it('returns single block for normal content', () => {
     const md = 'hello\nworld';
     const result = splitMarkdownBlocks(md);

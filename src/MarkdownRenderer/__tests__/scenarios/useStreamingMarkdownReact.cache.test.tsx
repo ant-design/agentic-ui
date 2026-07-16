@@ -53,6 +53,23 @@ describe('useStreamingMarkdownReact sealed subtree cache', () => {
     expect(spy.mock.calls.length - countAfterFirst).toBe(1);
   });
 
+  it('invalidates sealed block caches when streaming content is replaced', () => {
+    const spy = vi.spyOn(markdownReactShared, 'renderMarkdownBlock');
+    const initialContent = 'first sealed block\n\nfirst tail block';
+    const replacementContent = 'replacement sealed block\n\nreplacement tail';
+
+    const { rerender } = render(
+      <StreamingHarness content={initialContent} />,
+    );
+    const countAfterFirst = spy.mock.calls.length;
+
+    expect(countAfterFirst).toBe(2);
+
+    rerender(<StreamingHarness content={replacementContent} />);
+
+    expect(spy.mock.calls.length - countAfterFirst).toBe(2);
+  });
+
   it('fncProps 仅换引用时密封块不应再次 renderMarkdownBlock', () => {
     const spy = vi.spyOn(markdownReactShared, 'renderMarkdownBlock');
 

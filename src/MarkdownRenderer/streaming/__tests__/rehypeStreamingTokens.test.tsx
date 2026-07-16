@@ -68,6 +68,30 @@ describe('createStreamingTokenPlugin (hast transform)', () => {
     expect(tokens).not.toContain('inlineCode');
   });
 
+  it.each(['pre', 'style', 'script', 'textarea'])(
+    'keeps text inside <%s> untouched',
+    (tagName) => {
+      const plugin = createStreamingTokenPlugin({ enabled: true });
+      const transform = (plugin as any)();
+      const textNode = { type: 'text', value: 'protected content' };
+      const tree = {
+        type: 'root',
+        children: [
+          {
+            type: 'element',
+            tagName,
+            children: [textNode],
+          },
+        ],
+      };
+
+      transform(tree);
+
+      expect(collectSpanTokens(tree)).toEqual([]);
+      expect(tree.children[0].children).toEqual([textNode]);
+    },
+  );
+
   it('keeps KaTeX formula output untouched', () => {
     const hast = runProcessor(
       [
@@ -122,6 +146,30 @@ describe('createStreamingTokenPlugin (hast transform)', () => {
           type: 'element',
           tagName: 'span',
           properties: { className: ['katex'] },
+          children: [{ type: 'text', value: 'E = mc^2' }],
+        },
+      ],
+    };
+
+    transform(tree);
+
+    expect(collectSpanTokens(tree)).toEqual([]);
+    expect(tree.children[0].children[0]).toEqual({
+      type: 'text',
+      value: 'E = mc^2',
+    });
+  });
+
+  it('keeps math content with a string-valued KaTeX class untouched', () => {
+    const plugin = createStreamingTokenPlugin({ enabled: true });
+    const transform = (plugin as any)();
+    const tree = {
+      type: 'root',
+      children: [
+        {
+          type: 'element',
+          tagName: 'span',
+          properties: { className: 'Katex-display' },
           children: [{ type: 'text', value: 'E = mc^2' }],
         },
       ],
