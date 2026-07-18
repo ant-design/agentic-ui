@@ -14,6 +14,18 @@ describe('shouldReparseLastBlock', () => {
     expect(shouldReparseLastBlock(prev, next, true)).toBe(false);
   });
 
+  it('流式末块缩短时立即重新 parse', () => {
+    const prev = 'answer continued';
+    const next = 'answer';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
+  });
+
+  it('流式末块被非前缀内容替换时立即重新 parse', () => {
+    const prev = 'first answer';
+    const next = 'regenerated answer';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
+  });
+
   it('围栏闭合后恢复节流', () => {
     const prev = '```js\nx\n```\n';
     const next = '```js\nx\n```\nmore';
