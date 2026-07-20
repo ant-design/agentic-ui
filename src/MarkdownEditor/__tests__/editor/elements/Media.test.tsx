@@ -206,9 +206,9 @@ describe('Media', () => {
         </Media>,
       );
 
-      expect(screen.getByTestId('media-unsafe-url-plain-text')).toHaveTextContent(
-        unsafeUrl,
-      );
+      expect(
+        screen.getByTestId('media-unsafe-url-plain-text'),
+      ).toHaveTextContent(unsafeUrl);
       expect(screen.queryByTestId('media-container')).not.toBeInTheDocument();
       expect(screen.queryByTestId('resize-image')).not.toBeInTheDocument();
     });

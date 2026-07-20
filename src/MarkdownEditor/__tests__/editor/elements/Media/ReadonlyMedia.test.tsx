@@ -88,9 +88,9 @@ describe('ReadonlyMedia', () => {
 
       renderWithProvider({ ...baseElement, url: unsafeUrl });
 
-      expect(screen.getByTestId('media-unsafe-url-plain-text')).toHaveTextContent(
-        unsafeUrl,
-      );
+      expect(
+        screen.getByTestId('media-unsafe-url-plain-text'),
+      ).toHaveTextContent(unsafeUrl);
       expect(screen.queryByTestId('media-container')).not.toBeInTheDocument();
     });
 
