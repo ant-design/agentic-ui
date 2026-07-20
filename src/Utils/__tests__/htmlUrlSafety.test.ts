@@ -23,6 +23,10 @@ describe('htmlUrlSafety', () => {
       expect(shouldRenderUrlAsPlainText('javascript:alert(1)')).toBe(true);
     });
 
+    it('应将 vbscript: URL 识别为纯文本', () => {
+      expect(shouldRenderUrlAsPlainText('vbscript:msgbox(1)')).toBe(true);
+    });
+
     it('应允许正常 https URL', () => {
       expect(shouldRenderUrlAsPlainText('https://example.com/img.png')).toBe(
         false,
@@ -47,6 +51,19 @@ describe('htmlUrlSafety', () => {
           type: 'element',
           tagName: 'img',
           properties: { src: 'javascript:alert(1)' },
+        }),
+      ).toBe(true);
+    });
+
+    it('video 含 javascript: poster 时应整体降级', () => {
+      expect(
+        shouldElementRenderAsPlainText({
+          type: 'element',
+          tagName: 'video',
+          properties: {
+            src: 'https://example.com/video.mp4',
+            poster: 'javascript:alert(1)',
+          },
         }),
       ).toBe(true);
     });
