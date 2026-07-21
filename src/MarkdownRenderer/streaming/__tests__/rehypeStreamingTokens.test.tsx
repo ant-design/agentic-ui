@@ -68,6 +68,34 @@ describe('createStreamingTokenPlugin (hast transform)', () => {
     expect(tokens).not.toContain('inlineCode');
   });
 
+  it.each(['style', 'script', 'textarea'])(
+    'keeps text inside <%s> untouched',
+    (tagName) => {
+      const plugin = createStreamingTokenPlugin({ enabled: true });
+      const transform = (plugin as any)();
+      const protectedText = `${tagName} content`;
+      const tree = {
+        type: 'root',
+        children: [
+          { type: 'text', value: 'before' },
+          {
+            type: 'element',
+            tagName,
+            children: [{ type: 'text', value: protectedText }],
+          },
+          { type: 'text', value: 'after' },
+        ],
+      };
+
+      transform(tree);
+
+      expect(collectSpanTokens(tree)).toEqual(['before', 'after']);
+      expect(tree.children[1].children).toEqual([
+        { type: 'text', value: protectedText },
+      ]);
+    },
+  );
+
   it('keeps KaTeX formula output untouched', () => {
     const hast = runProcessor(
       [
