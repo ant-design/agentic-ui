@@ -186,6 +186,16 @@ describe('splitMarkdownBlocks', () => {
     expect(result[1]).toBe('Response.');
   });
 
+  it.each([
+    ['inline pair', '<think>inline thinking</think>'],
+    ['standalone open tag', '<think>\nthinking\n</think>'],
+    ['open tag with inline content', '<think>thinking\n</think>'],
+  ])('separates preceding content from a %s', (_, thinkBlock) => {
+    const md = `Previous response.\n\n${thinkBlock}`;
+
+    expect(splitMarkdownBlocks(md)).toEqual(['Previous response.', thinkBlock]);
+  });
+
   it('handles unclosed think tag (streaming mid-output)', () => {
     const md = '<think>\nThinking in progress...';
     const result = splitMarkdownBlocks(md);
