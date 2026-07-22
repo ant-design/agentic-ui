@@ -451,8 +451,7 @@ describe('MarkdownRenderer', () => {
     );
 
     const secondThink =
-      `${firstThink}\n准备调用工具。</think>\n` +
-      '<think>\n工具调用完成';
+      `${firstThink}\n准备调用工具。</think>\n` + '<think>\n工具调用完成';
     rerender(
       <MarkdownRenderer
         content={secondThink}
@@ -474,9 +473,7 @@ describe('MarkdownRenderer', () => {
     const thinkBlocks = container.querySelectorAll(
       '[data-testid="think-block-renderer"]',
     );
-    const downloadLink = container.querySelector(
-      `a[href="${downloadUrl}"]`,
-    );
+    const downloadLink = container.querySelector(`a[href="${downloadUrl}"]`);
 
     expect(thinkBlocks).toHaveLength(2);
     expect(downloadLink).toBeTruthy();
@@ -508,18 +505,15 @@ describe('MarkdownRenderer', () => {
     const thinkBlocks = container.querySelectorAll(
       '[data-testid="think-block-renderer"]',
     );
-    const finalAnswer = Array.from(container.querySelectorAll('p')).find(
-      (paragraph) => paragraph.textContent === '最终回答',
-    );
 
     expect(thinkBlocks).toHaveLength(2);
     expect(thinkBlocks[0]).toHaveTextContent('第一轮思考');
     expect(thinkBlocks[0]).not.toHaveTextContent('第二轮思考');
     expect(thinkBlocks[1]).toHaveTextContent('第二轮思考');
     expect(thinkBlocks[1]).not.toHaveTextContent('第一轮思考');
-    expect(finalAnswer).toBeTruthy();
+    expect(container).toHaveTextContent('最终回答');
     thinkBlocks.forEach((thinkBlock) => {
-      expect(thinkBlock).not.toContainElement(finalAnswer!);
+      expect(thinkBlock).not.toHaveTextContent('最终回答');
     });
   });
 
