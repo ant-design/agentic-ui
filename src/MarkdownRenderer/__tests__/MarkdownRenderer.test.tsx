@@ -486,6 +486,43 @@ describe('MarkdownRenderer', () => {
     });
   });
 
+  it('流式遇到新的 think 开标签时应独立渲染前一个思考块', () => {
+    const firstThink = '<think>\n第一轮思考';
+    const { container, rerender } = render(
+      <MarkdownRenderer
+        content={firstThink}
+        streaming
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    rerender(
+      <MarkdownRenderer
+        content={`${firstThink}\n<think>\n第二轮思考\n</think>\n\n最终回答`}
+        streaming
+        isFinished
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    const thinkBlocks = container.querySelectorAll(
+      '[data-testid="think-block-renderer"]',
+    );
+    const finalAnswer = Array.from(container.querySelectorAll('p')).find(
+      (paragraph) => paragraph.textContent === '最终回答',
+    );
+
+    expect(thinkBlocks).toHaveLength(2);
+    expect(thinkBlocks[0]).toHaveTextContent('第一轮思考');
+    expect(thinkBlocks[0]).not.toHaveTextContent('第二轮思考');
+    expect(thinkBlocks[1]).toHaveTextContent('第二轮思考');
+    expect(thinkBlocks[1]).not.toHaveTextContent('第一轮思考');
+    expect(finalAnswer).toBeTruthy();
+    thinkBlocks.forEach((thinkBlock) => {
+      expect(thinkBlock).not.toContainElement(finalAnswer!);
+    });
+  });
+
   it('应将 HTML 注释 + 表格组合渲染为图表', async () => {
     const content = [
       '<!-- [{"chartType":"line","title":"趋势","x":"month","y":"value"}] -->',
