@@ -440,6 +440,21 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
+  it('应将 <thinking> 标签渲染为思考块并隔离最终回答', () => {
+    const { container } = render(
+      <MarkdownRenderer
+        content={'<thinking>\n模型推理过程\n</thinking>\n\n最终回答'}
+      />,
+    );
+
+    const thinkBlock = container.querySelector(
+      '[data-testid="think-block-renderer"]',
+    );
+    expect(thinkBlock).toHaveTextContent('模型推理过程');
+    expect(thinkBlock).not.toHaveTextContent('最终回答');
+    expect(container).toHaveTextContent('最终回答');
+  });
+
   it('流式 think 闭合后应将最终链接渲染在思考块外', () => {
     const firstThink = '<think>\n分析用户请求';
     const { container, rerender } = render(
