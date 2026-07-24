@@ -349,6 +349,7 @@ export const TagPopup = (props: RenderProps) => {
             onClick: (e) => {
               onSelect?.(e.key, currentNodePath.current || []);
               suggestionConnext?.setOpen?.(false);
+              setOpen(false);
             },
           }}
         >

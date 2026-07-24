@@ -758,6 +758,26 @@ export const SlateMarkdownEditor = (props: MEditorProps) => {
       }
     }
 
+    // Re-anchor Slate selection from the actual DOM caret position.
+    // Without this, consecutive IME words in the same line cause Slate's
+    // internal composition range to drift: it still points at the previous
+    // candidate span, so insertCompositionText appends instead of replacing.
+    try {
+      const domSel = window.getSelection();
+      if (domSel && domSel.rangeCount > 0) {
+        const slateRange = ReactEditor.toSlateRange(
+          markdownEditorRef.current,
+          domSel,
+          { exactMatch: false, suppressThrow: true },
+        );
+        if (slateRange) {
+          Transforms.select(markdownEditorRef.current, slateRange);
+        }
+      }
+    } catch {
+      // DOM/Slate range conversion can fail in edge cases; ignore
+    }
+
     if (
       markdownEditorRef.current.selection &&
       Range.isCollapsed(markdownEditorRef.current.selection)

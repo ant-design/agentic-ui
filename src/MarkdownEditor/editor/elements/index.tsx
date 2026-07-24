@@ -383,7 +383,13 @@ const MLeafComponent = (
               setTimeout(() => {
                 if (!markdownEditorRef.current) return;
                 if (!path?.length) return;
-                const nextPath = Path.next(path);
+                // The ﻿ insert above shifted the chip one position forward.
+                // Use chipNewPath (not the original path) to find what comes after.
+                const chipNewPath = [
+                  ...path.slice(0, -1),
+                  path[path.length - 1] + 1,
+                ];
+                const nextPath = Path.next(chipNewPath);
                 if (!Editor.hasPath(markdownEditorRef.current, nextPath)) {
                   Transforms.insertNodes(
                     markdownEditorRef.current,
@@ -394,8 +400,8 @@ const MLeafComponent = (
                   );
                 } else {
                   Transforms.select(markdownEditorRef.current, {
-                    anchor: Editor.end(markdownEditorRef.current, path),
-                    focus: Editor.end(markdownEditorRef.current, path),
+                    anchor: Editor.start(markdownEditorRef.current, nextPath),
+                    focus: Editor.start(markdownEditorRef.current, nextPath),
                   });
                 }
               }, 0);
