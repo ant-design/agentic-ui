@@ -3,6 +3,16 @@ import { FILE_TYPES, FileCategory, FileNode } from '../types';
 const DEFAULT_MIME_TYPE = 'application/octet-stream';
 const TEXT_MIME_TYPE = 'text/plain';
 
+/**
+ * 从 URL 中提取文件扩展名，忽略 query / hash（CDN 签名链接常见）。
+ */
+const getUrlFileExtension = (url?: string): string | undefined => {
+  if (!url) return undefined;
+  const pathWithoutQueryOrHash = url.split(/[?#]/)[0];
+  const extension = pathWithoutQueryOrHash.split('.').pop()?.toLowerCase();
+  return extension || undefined;
+};
+
 const CODE_MIME_TYPES: string[] = [
   'text/javascript',
   'application/javascript',
@@ -113,7 +123,7 @@ export class UrlDataSourceStrategy implements DataSourceStrategy {
   }
 
   private getFileCategory(file: FileNode): FileCategory {
-    const extension = file.url?.split('.').pop()?.toLowerCase();
+    const extension = getUrlFileExtension(file.url);
     if (!extension) return FileCategory.Other;
 
     // 根据扩展名判断分类
@@ -136,7 +146,7 @@ export class UrlDataSourceStrategy implements DataSourceStrategy {
   }
 
   private inferMimeType(file: FileNode): string {
-    const extension = file.url?.split('.').pop()?.toLowerCase();
+    const extension = getUrlFileExtension(file.url);
     if (!extension) return DEFAULT_MIME_TYPE;
 
     for (const [, definition] of Object.entries(FILE_TYPES)) {

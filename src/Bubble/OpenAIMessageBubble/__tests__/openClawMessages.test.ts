@@ -41,6 +41,39 @@ describe('normalizeOpenClawMessagesToOpenAI', () => {
     expect(openai[1].role).toBe('tool');
     expect(openai[1].content).toBe('b');
   });
+
+  it('maps multipart toolResult content to plain text', () => {
+    const out = normalizeOpenClawMessageToOpenAI({
+      role: 'toolResult',
+      tool_call_id: 'call_mp',
+      name: 'search',
+      content: [
+        { type: 'text', text: 'hit-1' },
+        { type: 'image_url', image_url: { url: 'https://example.com/a.png' } },
+        { type: 'text', text: 'hit-2' },
+      ],
+    } as OpenClawChatMessage);
+
+    expect(out.role).toBe('tool');
+    expect(out.content).toBe('hit-1\n[image]\nhit-2');
+    expect((out as { name?: string }).name).toBe('search');
+    expect((out as { tool_call_id?: string }).tool_call_id).toBe('call_mp');
+  });
+
+  it('maps null or undefined toolResult content to empty string', () => {
+    const nullContent = normalizeOpenClawMessageToOpenAI({
+      role: 'toolResult',
+      content: null,
+      tool_call_id: 'c-null',
+    } as OpenClawChatMessage);
+    const undefinedContent = normalizeOpenClawMessageToOpenAI({
+      role: 'toolResult',
+      tool_call_id: 'c-undefined',
+    } as OpenClawChatMessage);
+
+    expect(nullContent.content).toBe('');
+    expect(undefinedContent.content).toBe('');
+  });
 });
 
 describe('mapOpenClawMessagesToMessageBubbleData', () => {
