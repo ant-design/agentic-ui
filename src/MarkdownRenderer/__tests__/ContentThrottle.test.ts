@@ -149,4 +149,42 @@ describe('ContentThrottle', () => {
     expect(flushed.at(-1)).toBe('abcdefghij');
     throttle.dispose();
   });
+
+  it('dispose 后取消待执行 tick，且不再 flush', () => {
+    const flushed: string[] = [];
+    const throttle = new ContentThrottle((s) => flushed.push(s), {
+      charsPerFrame: 2,
+    });
+
+    throttle.push('abcdefgh');
+    throttle.dispose();
+
+    vi.advanceTimersByTime(64);
+    expect(flushed).toEqual([]);
+    expect(throttle.getDisplayedLength()).toBe(0);
+  });
+
+  it('dispose 后移除 visibilitychange 监听，切页不再调度', () => {
+    const removeSpy = vi.spyOn(document, 'removeEventListener');
+    const flushed: string[] = [];
+    const throttle = new ContentThrottle((s) => flushed.push(s), {
+      charsPerFrame: 1,
+      backgroundInterval: 50,
+    });
+
+    throttle.push('abcdef');
+    throttle.dispose();
+
+    expect(removeSpy).toHaveBeenCalledWith(
+      'visibilitychange',
+      expect.any(Function),
+    );
+
+    setDocumentVisibility('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    vi.advanceTimersByTime(100);
+    expect(flushed).toEqual([]);
+
+    removeSpy.mockRestore();
+  });
 });
