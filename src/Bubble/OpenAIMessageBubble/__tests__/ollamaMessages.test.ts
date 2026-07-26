@@ -58,6 +58,51 @@ describe('normalizeOllamaMessagesToOpenAI', () => {
     expect(out.content).toContain('get_weather');
     expect(out.content).toContain('result');
   });
+
+  it('does not append thinking or image placeholders when options are disabled', () => {
+    const out = normalizeOllamaMessageToOpenAI(
+      {
+        role: 'assistant',
+        content: 'answer',
+        thinking: 'secret chain',
+        images: ['a', 'b'],
+      },
+      { appendThinkingToContent: false, appendImagesPlaceholder: false },
+    );
+    expect(out.content).toBe('answer');
+    expect(out.content).not.toContain('[thinking]');
+    expect(out.content).not.toContain('[images:');
+  });
+
+  it('passes tool_call_id and tool_name on tool messages', () => {
+    const out = normalizeOllamaMessageToOpenAI({
+      role: 'tool',
+      content: '42',
+      tool_name: 'calc',
+      tool_call_id: 'call_9',
+    });
+    expect(out.role).toBe('tool');
+    expect((out as { tool_call_id?: string }).tool_call_id).toBe('call_9');
+    expect((out as { name?: string }).name).toBe('calc');
+    expect(out.content).toBe('[tool_name: calc]\n42');
+  });
+
+  it('maps system role without mutating content', () => {
+    const out = normalizeOllamaMessageToOpenAI({
+      role: 'system',
+      content: 'be helpful',
+    });
+    expect(out).toEqual({ role: 'system', content: 'be helpful' });
+  });
+
+  it('appends thinking alone when content is empty', () => {
+    const out = normalizeOllamaMessageToOpenAI({
+      role: 'assistant',
+      content: '',
+      thinking: 'only think',
+    });
+    expect(out.content).toBe('[thinking]\nonly think');
+  });
 });
 
 describe('mapOllamaMessagesToMessageBubbleData', () => {
@@ -108,5 +153,36 @@ describe('mapOllamaMessagesToMessageBubbleData', () => {
     const o1 = mapOllamaMessagesToMessageBubbleData(short, { baseTime });
     const o2 = mapOllamaMessagesToMessageBubbleData(long, { baseTime });
     expect(o1[0].id).toBe(o2[0].id);
+  });
+
+  it('forwards append options through mapOllamaMessagesToMessageBubbleData', () => {
+    const out = mapOllamaMessagesToMessageBubbleData(
+      [
+        {
+          role: 'user',
+          content: 'see',
+          thinking: 'hidden',
+          images: ['img'],
+        },
+      ],
+      {
+        baseTime,
+        appendThinkingToContent: false,
+        appendImagesPlaceholder: false,
+      },
+    );
+    expect(out[0].originContent).toBe('see');
+  });
+
+  it('applies mapMessage override after normalize', () => {
+    const out = mapOllamaMessagesToMessageBubbleData(
+      [{ role: 'user', content: 'raw' }],
+      { baseTime },
+      (_msg, _index, draft) => ({
+        ...draft,
+        originContent: 'overridden',
+      }),
+    );
+    expect(out[0].originContent).toBe('overridden');
   });
 });

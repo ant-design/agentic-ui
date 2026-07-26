@@ -147,6 +147,42 @@ describe('DataSourceStrategy', () => {
       expect(result.mimeType).toBe('application/octet-stream');
     });
 
+    it('应忽略 query 参数正确识别图片扩展名与预览能力', () => {
+      const file = {
+        id: 'f1',
+        name: 'image.png',
+        url: 'https://cdn.example.com/assets/image.png?X-Amz-Signature=abc&x=1.2',
+      };
+      const result = strategy.process(file);
+
+      expect(result.previewCapability).toBe(PreviewCapability.BASIC);
+      expect(result.mimeType).toContain('image/');
+    });
+
+    it('应忽略 hash 片段正确识别 MIME 类型', () => {
+      const file = {
+        id: 'f1',
+        name: 'doc.pdf',
+        url: 'https://example.com/files/report.pdf#page=2',
+      };
+      const result = strategy.process(file);
+
+      expect(result.previewCapability).toBe(PreviewCapability.NONE);
+      expect(result.mimeType).toBe('application/pdf');
+    });
+
+    it('大小写扩展名在带 query 时应仍可识别', () => {
+      const file = {
+        id: 'f1',
+        name: 'Photo.JPG',
+        url: 'https://example.com/Photo.JPG?download=1',
+      };
+      const result = strategy.process(file);
+
+      expect(result.previewCapability).toBe(PreviewCapability.BASIC);
+      expect(result.mimeType).toContain('image/');
+    });
+
     it('应该在URL不存在时抛出错误', () => {
       const file = { id: 'f1', name: 'file.txt' };
       expect(() => strategy.process(file)).toThrow('URL not provided');

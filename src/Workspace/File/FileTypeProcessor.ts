@@ -160,7 +160,12 @@ export class FileTypeProcessor {
    * 从URL推断文件类型
    */
   private getTypeFromUrl(url: string): FileType | null {
-    const urlExtension = url.split('.').pop()?.split('?')[0]?.toLowerCase();
+    // 与 UrlDataSourceStrategy 一致：忽略 query / hash，避免签名 URL 误判扩展名
+    const urlExtension = url
+      .split(/[?#]/)[0]
+      .split('.')
+      .pop()
+      ?.toLowerCase();
     if (!urlExtension) return null;
 
     for (const [type, definition] of Object.entries(FILE_TYPES)) {

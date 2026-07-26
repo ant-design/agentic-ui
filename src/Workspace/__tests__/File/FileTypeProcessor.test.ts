@@ -117,6 +117,18 @@ describe('FileTypeProcessor', () => {
       expect(result.fileType).toBe('image');
     });
 
+    it('应该处理带 hash 片段的 URL', () => {
+      const file = {
+        id: 'f1',
+        name: 'file',
+        url: 'https://example.com/report.pdf#page=3',
+      };
+      const result = processor.inferFileType(file);
+
+      expect(result.fileType).toBe('pdf');
+      expect(result.category).toBe(FileCategory.PDF);
+    });
+
     it('应该使用displayType', () => {
       const file = {
         id: 'f1',

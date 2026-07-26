@@ -60,6 +60,30 @@ describe('withOrphanInlineLeafNormalize', () => {
     });
   });
 
+  it('strips placeholder tag when text is empty', () => {
+    const editor = withOrphanInlineLeafNormalize(createEditor());
+    editor.children = [
+      {
+        type: 'paragraph',
+        children: [
+          {
+            text: '',
+            tag: true,
+            code: true,
+            placeholder: '任务名称',
+            triggerText: '[markdown]',
+          },
+        ],
+      },
+    ];
+
+    Editor.normalize(editor, { force: true });
+
+    expect(editor.children[0].children).toEqual([
+      { text: ' ', placeholder: '任务名称' },
+    ]);
+  });
+
   it('strips tag decoration when text is empty', () => {
     const editor = withOrphanInlineLeafNormalize(createEditor());
     editor.children = [

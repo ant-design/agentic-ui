@@ -193,6 +193,25 @@ describe('Media', () => {
       );
       expect(resizeImage).toHaveAttribute('alt', 'image');
     });
+
+    it('危险 URL 应降级为纯文本且不挂载可编辑媒体', () => {
+      const unsafeUrl = 'javascript:alert(1)';
+
+      renderWithProvider(
+        <Media
+          element={{ ...mockElement, url: unsafeUrl }}
+          attributes={mockAttributes}
+        >
+          {null}
+        </Media>,
+      );
+
+      expect(
+        screen.getByTestId('media-unsafe-url-plain-text'),
+      ).toHaveTextContent(unsafeUrl);
+      expect(screen.queryByTestId('media-container')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('resize-image')).not.toBeInTheDocument();
+    });
   });
 
   describe('ResizeImage组件测试', () => {

@@ -228,6 +228,57 @@ describe('ToolUseBarThink', () => {
     }
   });
 
+  it('展开后在滚动定时器触发前收起应取消滚动，避免视口跳动', () => {
+    const scrollIntoViewSpy = vi.fn();
+    vi.useFakeTimers();
+    Element.prototype.scrollIntoView = scrollIntoViewSpy;
+
+    try {
+      const { rerender } = render(
+        <Wrapper>
+          <ToolUseBarThink
+            toolName="Test"
+            expanded={false}
+            scrollIntoViewOnExpand
+          />
+        </Wrapper>,
+      );
+
+      rerender(
+        <Wrapper>
+          <ToolUseBarThink
+            toolName="Test"
+            expanded={true}
+            scrollIntoViewOnExpand
+          />
+        </Wrapper>,
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(100);
+      });
+      expect(scrollIntoViewSpy).not.toHaveBeenCalled();
+
+      rerender(
+        <Wrapper>
+          <ToolUseBarThink
+            toolName="Test"
+            expanded={false}
+            scrollIntoViewOnExpand
+          />
+        </Wrapper>,
+      );
+
+      act(() => {
+        vi.advanceTimersByTime(350);
+      });
+      expect(scrollIntoViewSpy).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      delete (Element.prototype as Partial<Element>).scrollIntoView;
+    }
+  });
+
   it('内容溢出时显示展开/收起按钮并可点击', () => {
     const originalRO = global.ResizeObserver;
     global.ResizeObserver = class MockResizeObserver {

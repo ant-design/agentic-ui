@@ -1,6 +1,15 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useVoiceInputManager } from '../VoiceInputManager';
+
+/** Creates a promise whose completion can be controlled by a test. */
+const createDeferred = <Value,>() => {
+  let resolve: (value: Value | PromiseLike<Value>) => void = () => undefined;
+  const promise = new Promise<Value>((resolver) => {
+    resolve = resolver;
+  });
+  return { promise, resolve };
+};
 
 describe('useVoiceInputManager', () => {
   const mockEditorRef = {
@@ -224,6 +233,81 @@ describe('useVoiceInputManager', () => {
       await result.current.stopRecording();
 
       // 应该没有错误，状态保持 false
+      expect(result.current.recording).toBe(false);
+    });
+
+    it('应该取消尚未创建完成的识别器并允许再次启动', async () => {
+      const recognizerCreation =
+        createDeferred<ReturnType<typeof createMockRecognizer>>();
+      const cancelledRecognizer = createMockRecognizer();
+      const restartedRecognizer = createMockRecognizer();
+      const mockVoiceRecognizer = vi
+        .fn()
+        .mockImplementationOnce(() => recognizerCreation.promise)
+        .mockResolvedValueOnce(restartedRecognizer);
+
+      const { result } = renderHook(() =>
+        useVoiceInputManager({
+          ...defaultProps,
+          voiceRecognizer: mockVoiceRecognizer,
+        }),
+      );
+
+      let pendingStart!: Promise<void>;
+      act(() => {
+        pendingStart = result.current.startRecording();
+      });
+      await act(async () => {
+        await result.current.stopRecording();
+      });
+      await act(async () => {
+        recognizerCreation.resolve(cancelledRecognizer);
+        await pendingStart;
+      });
+
+      expect(cancelledRecognizer.start).not.toHaveBeenCalled();
+      expect(cancelledRecognizer.stop).toHaveBeenCalledTimes(1);
+      expect(result.current.recording).toBe(false);
+
+      await act(async () => {
+        await result.current.startRecording();
+      });
+
+      expect(mockVoiceRecognizer).toHaveBeenCalledTimes(2);
+      expect(restartedRecognizer.start).toHaveBeenCalledTimes(1);
+      expect(result.current.recording).toBe(true);
+    });
+
+    it('应该停止已创建但仍在启动中的识别器', async () => {
+      const recognizerStart = createDeferred<void>();
+      const mockRecognizer = createMockRecognizer({
+        start: vi.fn().mockReturnValue(recognizerStart.promise),
+      });
+      const mockVoiceRecognizer = vi.fn().mockResolvedValue(mockRecognizer);
+
+      const { result } = renderHook(() =>
+        useVoiceInputManager({
+          ...defaultProps,
+          voiceRecognizer: mockVoiceRecognizer,
+        }),
+      );
+
+      let pendingStart!: Promise<void>;
+      act(() => {
+        pendingStart = result.current.startRecording();
+      });
+      await waitFor(() => {
+        expect(mockRecognizer.start).toHaveBeenCalledTimes(1);
+      });
+      await act(async () => {
+        await result.current.stopRecording();
+      });
+      await act(async () => {
+        recognizerStart.resolve();
+        await pendingStart;
+      });
+
+      expect(mockRecognizer.stop).toHaveBeenCalledTimes(1);
       expect(result.current.recording).toBe(false);
     });
   });
