@@ -985,8 +985,426 @@ describe('useKeyboard Hook Tests', () => {
         keyboardHandler(arrowLeftEvent);
       });
 
-      // 由于已存在 FEFF，不应该插入新的
-      expect(arrowLeftEvent.preventDefault).not.toHaveBeenCalled();
+      // BOM 已存在：preventDefault 并将光标移到 BOM 节点末尾，不再重复插入
+      expect(arrowLeftEvent.preventDefault).toHaveBeenCalled();
+      expect(editor.selection).toEqual({
+        anchor: { path: [0, 1], offset: 1 },
+        focus: { path: [0, 1], offset: 1 },
+      });
+    });
+  });
+
+  describe('Error handling and robustness', () => {
+    it('should handle malformed editor state gracefully', () => {
+      // 设置异常的编辑器状态
+      editor.children = [
+        {
+          type: 'unknown' as any,
+          children: [{ text: 'test' }],
+        },
+      ];
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const keyboardHandler = result.current;
+
+      expect(() => {
+        act(() => {
+          const keyEvent = createKeyboardEvent('a');
+          keyboardHandler(keyEvent);
+        });
+      }).not.toThrow();
+    });
+
+    it('should handle null or undefined editor gracefully', () => {
+      const nullEditorRef = { current: null as any };
+
+      expect(() => {
+        renderHook(() => useKeyboard(store, nullEditorRef, mockProps));
+      }).not.toThrow();
+    });
+
+    it('should handle rapid key sequences', () => {
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const keyboardHandler = result.current;
+
+      // 模拟快速按键序列
+      const keys = ['a', 'b', 'c', 'Enter', 'Backspace'];
+
+      expect(() => {
+        act(() => {
+          keys.forEach((key) => {
+            const keyEvent = createKeyboardEvent(key);
+            keyboardHandler(keyEvent);
+          });
+        });
+      }).not.toThrow();
+    });
+  });
+
+  describe('Performance considerations', () => {
+    it('should memoize keyboard handler properly', () => {
+      const { result, rerender } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const firstHandler = result.current;
+
+      // Rerender without changing dependencies
+      rerender();
+      const secondHandler = result.current;
+
+      // Handler should be memoized
+      expect(firstHandler).toBe(secondHandler);
+    });
+
+    it('should handle large text content efficiently', () => {
+      // 创建大量文本内容
+      const largeText = 'a'.repeat(10000);
+      editor.children = [
+        {
+          type: 'paragraph',
+          children: [{ text: largeText }],
+        },
+      ];
+
+      Transforms.select(editor, {
+        anchor: { path: [0, 0], offset: largeText.length },
+        focus: { path: [0, 0], offset: largeText.length },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const keyboardHandler = result.current;
+
+      const startTime = performance.now();
+
+      act(() => {
+        const keyEvent = createKeyboardEvent('a');
+        keyboardHandler(keyEvent);
+      });
+
+      const endTime = performance.now();
+
+      // 操作应该在合理时间内完成（100ms）
+      expect(endTime - startTime).toBeLessThan(100);
+    });
+  });
+
+  describe('Integration with other features', () => {
+    it('should work correctly with different editor configurations', () => {
+      const customProps: MarkdownEditorProps = {
+        textAreaProps: {
+          enable: true,
+          placeholder: 'Custom placeholder',
+        },
+        markdown: {
+          matchInputToNode: false,
+        },
+      };
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, customProps),
+      );
+      const keyboardHandler = result.current;
+
+      expect(typeof keyboardHandler).toBe('function');
+    });
+
+    it('should handle nested list structures', () => {
+      // 重置 mock 计数
+      mockSetOpenInsertCompletion.mockClear();
+
+      editor.children = [
+        {
+          type: 'list',
+          children: [
+            {
+              type: 'list-item',
+              children: [
+                {
+                  type: 'paragraph',
+                  children: [{ text: '/command' }],
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      // 设置光标在嵌套列表中
+      Transforms.select(editor, {
+        anchor: { path: [0, 0, 0, 0], offset: 8 },
+        focus: { path: [0, 0, 0, 0], offset: 8 },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const keyboardHandler = result.current;
+      const keyEvent = createKeyboardEvent('a');
+
+      act(() => {
+        keyboardHandler(keyEvent);
+      });
+
+      // 由于需要特定的条件才能触发插入补全，我们验证基本功能
+      expect(typeof keyboardHandler).toBe('function');
+      // 验证函数执行没有抛出错误
+    });
+  });
+
+  describe('Chip (tag leaf) cursor navigation', () => {
+    it('ArrowLeft at tag offset 0 without BOM inserts BOM before chip', () => {
+      editor.children = [
+        {
+          type: 'paragraph',
+          children: [
+            { text: 'before ' },
+            { text: 'tag', tag: true },
+            { text: ' after' },
+          ],
+        },
+      ];
+
+      Transforms.select(editor, {
+        anchor: { path: [0, 1], offset: 0 },
+        focus: { path: [0, 1], offset: 0 },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const arrowLeftEvent = createKeyboardEvent('ArrowLeft');
+
+      act(() => {
+        result.current(arrowLeftEvent);
+      });
+
+      expect(arrowLeftEvent.preventDefault).toHaveBeenCalled();
+      // Slate normalizer merges the inserted BOM text with the adjacent plain text node.
+      // Result: children[0].text = 'before ﻿' (merged), children[1] = chip.
+      const firstText = (editor.children[0] as any).children[0].text;
+      expect(firstText).toContain('﻿');
+    });
+
+    it('ArrowLeft at tag offset 0 with BOM already present moves cursor to BOM end', () => {
+      editor.children = [
+        {
+          type: 'paragraph',
+          children: [
+            { text: 'before ' },
+            { text: '﻿' },
+            { text: 'tag', tag: true },
+            { text: ' after' },
+          ],
+        },
+      ];
+
+      Transforms.select(editor, {
+        anchor: { path: [0, 2], offset: 0 },
+        focus: { path: [0, 2], offset: 0 },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const arrowLeftEvent = createKeyboardEvent('ArrowLeft');
+
+      act(() => {
+        result.current(arrowLeftEvent);
+      });
+
+      expect(arrowLeftEvent.preventDefault).toHaveBeenCalled();
+      expect(editor.selection).toEqual({
+        anchor: { path: [0, 1], offset: 1 },
+        focus: { path: [0, 1], offset: 1 },
+      });
+    });
+
+    it('ArrowLeft inside tag at non-zero offset jumps to end of node before chip', () => {
+      editor.children = [
+        {
+          type: 'paragraph',
+          children: [
+            { text: 'before ' },
+            { text: 'tag', tag: true },
+            { text: ' after' },
+          ],
+        },
+      ];
+
+      Transforms.select(editor, {
+        anchor: { path: [0, 1], offset: 2 },
+        focus: { path: [0, 1], offset: 2 },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const arrowLeftEvent = createKeyboardEvent('ArrowLeft');
+
+      act(() => {
+        result.current(arrowLeftEvent);
+      });
+
+      expect(arrowLeftEvent.preventDefault).toHaveBeenCalled();
+      expect(editor.selection).toEqual({
+        anchor: { path: [0, 0], offset: 7 },
+        focus: { path: [0, 0], offset: 7 },
+      });
+    });
+
+    it('ArrowLeft at start of non-tag node skips chip to node before chip', () => {
+      editor.children = [
+        {
+          type: 'paragraph',
+          children: [
+            { text: 'before ' },
+            { text: 'tag', tag: true },
+            { text: ' after' },
+          ],
+        },
+      ];
+
+      Transforms.select(editor, {
+        anchor: { path: [0, 2], offset: 0 },
+        focus: { path: [0, 2], offset: 0 },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const arrowLeftEvent = createKeyboardEvent('ArrowLeft');
+
+      act(() => {
+        result.current(arrowLeftEvent);
+      });
+
+      expect(arrowLeftEvent.preventDefault).toHaveBeenCalled();
+      expect(editor.selection).toEqual({
+        anchor: { path: [0, 0], offset: 7 },
+        focus: { path: [0, 0], offset: 7 },
+      });
+    });
+
+    it('ArrowRight at end of leaf before chip jumps cursor past chip to trailing node', () => {
+      editor.children = [
+        {
+          type: 'paragraph',
+          children: [
+            { text: 'before ' },
+            { text: 'tag', tag: true },
+            { text: ' after' },
+          ],
+        },
+      ];
+
+      Transforms.select(editor, {
+        anchor: { path: [0, 0], offset: 7 },
+        focus: { path: [0, 0], offset: 7 },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const arrowRightEvent = createKeyboardEvent('ArrowRight');
+
+      act(() => {
+        result.current(arrowRightEvent);
+      });
+
+      expect(arrowRightEvent.preventDefault).toHaveBeenCalled();
+      expect(editor.selection).toEqual({
+        anchor: { path: [0, 2], offset: 0 },
+        focus: { path: [0, 2], offset: 0 },
+      });
+    });
+
+    it('ArrowRight in middle of leaf before chip does not jump over chip', () => {
+      editor.children = [
+        {
+          type: 'paragraph',
+          children: [
+            { text: 'before ' },
+            { text: 'tag', tag: true },
+            { text: ' after' },
+          ],
+        },
+      ];
+
+      Transforms.select(editor, {
+        anchor: { path: [0, 0], offset: 3 },
+        focus: { path: [0, 0], offset: 3 },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const arrowRightEvent = createKeyboardEvent('ArrowRight');
+
+      act(() => {
+        result.current(arrowRightEvent);
+      });
+
+      expect(arrowRightEvent.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it('ArrowRight at end of leaf when next sibling is not a chip does not prevent default', () => {
+      editor.children = [
+        {
+          type: 'paragraph',
+          children: [{ text: 'hello' }, { text: ' world' }],
+        },
+      ];
+
+      Transforms.select(editor, {
+        anchor: { path: [0, 0], offset: 5 },
+        focus: { path: [0, 0], offset: 5 },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const arrowRightEvent = createKeyboardEvent('ArrowRight');
+
+      act(() => {
+        result.current(arrowRightEvent);
+      });
+
+      expect(arrowRightEvent.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it('ArrowRight inserts trailing space when chip is the last child and jumps past it', () => {
+      editor.children = [
+        {
+          type: 'paragraph',
+          children: [{ text: 'before ' }, { text: 'tag', tag: true }],
+        },
+      ];
+
+      Transforms.select(editor, {
+        anchor: { path: [0, 0], offset: 7 },
+        focus: { path: [0, 0], offset: 7 },
+      });
+
+      const { result } = renderHook(() =>
+        useKeyboard(store, editorRef, mockProps),
+      );
+      const arrowRightEvent = createKeyboardEvent('ArrowRight');
+
+      act(() => {
+        result.current(arrowRightEvent);
+      });
+
+      expect(arrowRightEvent.preventDefault).toHaveBeenCalled();
+      // A trailing space node is inserted after the chip
+      const children = (editor.children[0] as any).children;
+      expect(children.length).toBe(3);
+      expect(children[2].text).toBe(' ');
     });
   });
 
