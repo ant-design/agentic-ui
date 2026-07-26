@@ -1,8 +1,8 @@
 import '@testing-library/jest-dom';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ConfigProvider } from 'antd';
 import React from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { AILabel } from '..';
 
 const renderWithAntd = (ui: React.ReactElement) =>
@@ -56,5 +56,20 @@ describe('AILabel', () => {
       <AILabel tooltip={{ title: 'Test Tooltip' }} />,
     );
     expect(container.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('forwards tooltip onOpenChange when tooltip opens', async () => {
+    const onOpenChange = vi.fn();
+    const { container } = renderWithAntd(
+      <AILabel tooltip={{ title: 'Test Tooltip', onOpenChange }} />,
+    );
+
+    const trigger = container.querySelector('sup');
+    expect(trigger).toBeInTheDocument();
+    fireEvent.mouseEnter(trigger!);
+
+    await waitFor(() => {
+      expect(onOpenChange).toHaveBeenCalledWith(true);
+    });
   });
 });

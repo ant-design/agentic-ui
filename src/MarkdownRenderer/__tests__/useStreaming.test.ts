@@ -1010,4 +1010,77 @@ describe('useStreaming', () => {
       expect(result.current).toBe('');
     });
   });
+
+  // ================================================================
+  // think 标签流式场景：验证 useStreaming 不会吞掉 think 块内的内容
+  // ================================================================
+  it('think tag with blank lines: useStreaming outputs complete content', async () => {
+    const { result, rerender } = renderHook(
+      ({ input, enabled }: UseStreamingHookProps) =>
+        useStreaming(input, enabled),
+      {
+        initialProps: {
+          input: '',
+          enabled: true,
+        },
+      },
+    );
+
+    // 帧 1: <think> tag arrives
+    rerender({ input: '<think>', enabled: true });
+    await waitFor(() => {
+      // <think> is a complete HTML token, should be committed
+      expect(result.current).toContain('<think>');
+    });
+
+    // 帧 2: thinking content with blank line
+    rerender({
+      input: '<think>\nStep one\n\nStep two',
+      enabled: true,
+    });
+    await waitFor(() => {
+      // All content after <think> should be committed (plain text commits immediately)
+      expect(result.current).toContain('<think>');
+      expect(result.current).toContain('Step one');
+      expect(result.current).toContain('Step two');
+    });
+
+    // 帧 3: close tag + more content
+    rerender({
+      input: '<think>\nStep one\n\nStep two\n</think>\nResponse',
+      enabled: true,
+    });
+    await waitFor(() => {
+      expect(result.current).toContain('</think>');
+      expect(result.current).toContain('Response');
+    });
+  });
+
+  it('think tag streaming: content with link and blank line inside', async () => {
+    const { result, rerender } = renderHook(
+      ({ input, enabled }: UseStreamingHookProps) =>
+        useStreaming(input, enabled),
+      {
+        initialProps: {
+          input: '',
+          enabled: true,
+        },
+      },
+    );
+
+    // 模拟用户描述的场景：think 块内出现 "link.\n\n" 导致深度思考提前结束
+    rerender({
+      input: '<think>\nAnalyzing the problem\n\nVisit link.\n\nContinuing...',
+      enabled: true,
+    });
+
+    await waitFor(() => {
+      const output = result.current;
+      // useStreaming 应该输出完整内容
+      expect(output).toContain('<think>');
+      expect(output).toContain('Analyzing the problem');
+      expect(output).toContain('Visit link.');
+      expect(output).toContain('Continuing...');
+    });
+  });
 });

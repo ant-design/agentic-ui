@@ -54,6 +54,46 @@ describe('parseCode handleCode', () => {
     );
     expect(result.otherProps).toBeDefined();
   });
+
+  it('should mark stream as loading when fenced code lacks trailing newline', () => {
+    const result = handleCode({
+      value: 'graph TD',
+      lang: 'mermaid',
+      meta: undefined,
+    });
+    expect(result.otherProps?.finished).toBe(false);
+  });
+
+  it('should honor finished=true from incoming otherProps', () => {
+    const result = handleCode({
+      value: 'done\n',
+      lang: 'text',
+      meta: undefined,
+      otherProps: { finished: true },
+    });
+    expect(result.otherProps?.finished).not.toBe(false);
+  });
+
+  it('should attach base otherProps when handler result has none', () => {
+    const result = handleCode(
+      {
+        value: 'x^2',
+        lang: 'katex',
+        meta: undefined,
+        otherProps: { keep: 1 },
+      },
+      { fromConfig: 2 },
+    );
+    expect(result.otherProps).toMatchObject({ keep: 1, fromConfig: 2 });
+  });
+
+  it('should assign config-only otherProps for plain code blocks', () => {
+    const result = handleCode(
+      { value: 'plain\n', lang: 'text', meta: undefined },
+      { stream: true },
+    );
+    expect(result.otherProps).toMatchObject({ stream: true });
+  });
 });
 
 describe('parseCode agentic-ui embed blocks', () => {

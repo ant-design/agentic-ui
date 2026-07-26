@@ -34,6 +34,19 @@ describe('getScroll', () => {
     expect(getScroll(el)).toBe(0);
   });
 
+  it('returns scrollTop from loose mock target', () => {
+    expect(getScroll({ scrollTop: 42 } as never)).toBe(42);
+  });
+
+  it('falls back to ownerDocument scrollTop when scrollTop is not a number', () => {
+    expect(
+      getScroll({
+        scrollTop: 'invalid',
+        ownerDocument: { documentElement: { scrollTop: 88 } },
+      } as never),
+    ).toBe(88);
+  });
+
   it('returns pageYOffset for window', () => {
     expect(getScroll(window)).toBe(0);
   });
@@ -55,6 +68,19 @@ describe('getScrollRailHeight', () => {
   it('returns rail height for element', () => {
     const el = document.createElement('div');
     expect(getScrollRailHeight(el)).toBe(0);
+  });
+
+  it('returns scrollHeight minus offsetHeight for element with content', () => {
+    const el = document.createElement('div');
+    Object.defineProperty(el, 'scrollHeight', {
+      value: 500,
+      configurable: true,
+    });
+    Object.defineProperty(el, 'offsetHeight', {
+      value: 200,
+      configurable: true,
+    });
+    expect(getScrollRailHeight(el)).toBe(300);
   });
 });
 

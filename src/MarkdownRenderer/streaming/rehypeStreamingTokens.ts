@@ -18,14 +18,8 @@ const SKIP_TAGS = new Set([
   'pre',
   'style',
   'script',
-  'table',
-  'tbody',
-  'td',
   'textarea',
-  'tfoot',
-  'th',
-  'thead',
-  'tr',
+  'table',
 ]);
 
 /** 公式渲染（KaTeX）自带复杂结构，拆分会破坏布局 */

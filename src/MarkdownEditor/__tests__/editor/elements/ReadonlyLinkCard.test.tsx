@@ -105,6 +105,32 @@ describe('ReadonlyLinkCard', () => {
     expect(screen.getByText('2026-02-13')).toBeInTheDocument();
   });
 
+  it('finished=false 超时后回退到 title 或 name', () => {
+    renderCard({
+      ...baseElement,
+      finished: false,
+      url: '',
+      title: 'Fallback title',
+      name: '',
+    });
+    act(() => {
+      vi.advanceTimersByTime(5001);
+    });
+    expect(screen.getByText('Fallback title')).toBeInTheDocument();
+  });
+
+  it('finished=true 时无 icon 与 collaborators 仍正常渲染', () => {
+    renderCard({
+      ...baseElement,
+      icon: '',
+      description: '',
+      otherProps: { updateTime: '' },
+    });
+    expect(screen.getByText('Title')).toBeInTheDocument();
+    expect(screen.getByText('https://example.com')).toBeInTheDocument();
+    expect(screen.queryByTestId('avatar-list')).not.toBeInTheDocument();
+  });
+
   it('点击卡片容器和标题链接都会触发 window.open', () => {
     renderCard({ ...baseElement, finished: true });
     const linkCard = document.querySelector('[data-be="link-card"]');
