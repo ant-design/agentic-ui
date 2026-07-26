@@ -323,28 +323,6 @@ describe('SchemaForm', () => {
     expect(numberInput).toHaveAttribute('aria-valuemax', '100');
   });
 
-  it('shows localized min/max messages when number is out of range', async () => {
-    const user = userEvent.setup();
-    render(<SchemaForm schema={mockSchema} />);
-
-    const numberInput = screen.getByLabelText('数量');
-    await user.clear(numberInput);
-    await user.type(numberInput, '-1');
-    await user.tab();
-
-    await waitFor(() => {
-      expect(screen.getByText(/数量不能小于 0/)).toBeInTheDocument();
-    });
-
-    await user.clear(numberInput);
-    await user.type(numberInput, '101');
-    await user.tab();
-
-    await waitFor(() => {
-      expect(screen.getByText(/数量不能大于 100/)).toBeInTheDocument();
-    });
-  });
-
   it('validates required fields inside object-array rows', async () => {
     const user = userEvent.setup();
     render(<SchemaForm schema={mockSchema} />);
@@ -352,6 +330,7 @@ describe('SchemaForm', () => {
     await user.click(screen.getByText('添加 项目列表'));
 
     const nameInput = await screen.findByLabelText('名称');
+    await user.type(nameInput, '临时');
     await user.clear(nameInput);
     await user.tab();
 

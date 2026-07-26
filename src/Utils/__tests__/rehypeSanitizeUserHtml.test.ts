@@ -181,13 +181,14 @@ describe('rehypeSanitizeUserHtml', () => {
       expect(result).toMatch(/&#x3C;iframe|&lt;iframe/i);
     });
 
-    it('应剥离 img srcset 中的危险 URL scheme', async () => {
+    it('应将含危险 srcset 的 img 降级为纯文本', async () => {
       const result = await markdownToHtml(
         '<img src="https://example.com/a.png" srcset="javascript:alert(1) 1x" alt="x">',
       );
-      expect(result).toMatch(/<img[\s>]/i);
-      expect(result).not.toMatch(/srcset=["'][^"']*javascript:/i);
-      expect(result).toContain('src="https://example.com/a.png"');
+      // srcset 值以 javascript: 开头时，整节点走纯文本降级，避免残留可执行属性
+      expect(result).not.toMatch(/<img[\s>]/i);
+      expect(result).toMatch(/&#x3C;img|&lt;img/i);
+      expect(result).toContain('javascript:');
     });
 
     it('应将含 onload 的 svg 降级为纯文本', async () => {
