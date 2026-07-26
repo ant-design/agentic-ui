@@ -116,6 +116,14 @@ describe('splitMarkdownBlocks', () => {
     expect(result[1]).toBe('| a | b |\n| - | - |\n| 1 | 2 |');
   });
 
+  it('splits heading from following pipe-less table without blank line', () => {
+    const md = '# Title\na | b\n- | -\n1 | 2';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('# Title');
+    expect(result[1]).toBe('a | b\n- | -\n1 | 2');
+  });
+
   it('does not split inside <think> tags with blank lines', () => {
     const md =
       '<think>\nHere is thinking:\n\n1. Step one\n\n2. Step two\n</think>\n\nResponse text.';
@@ -184,6 +192,16 @@ describe('splitMarkdownBlocks', () => {
       '<think>thinking starts here\n\ncontinues\n</think>',
     );
     expect(result[1]).toBe('Response.');
+  });
+
+  it.each([
+    ['inline pair', '<think>inline thinking</think>'],
+    ['standalone open tag', '<think>\nthinking\n</think>'],
+    ['open tag with inline content', '<think>thinking\n</think>'],
+  ])('separates preceding content from a %s', (_, thinkBlock) => {
+    const md = `Previous response.\n\n${thinkBlock}`;
+
+    expect(splitMarkdownBlocks(md)).toEqual(['Previous response.', thinkBlock]);
   });
 
   it('handles unclosed think tag (streaming mid-output)', () => {
@@ -267,6 +285,15 @@ describe('splitMarkdownBlocks', () => {
     expect(result.length).toBe(2);
     expect(result[0]).toBe('<thinking>\nFirst round');
     expect(result[1]).toBe('<thinking>\nSecond round\n</thinking>');
+  });
+
+  it('separates cross-alias think blocks while preserving blank lines', () => {
+    const md =
+      '<think>\nFirst round\n\nStill thinking\n<thinking>\nSecond round\n</thinking>';
+    expect(splitMarkdownBlocks(md)).toEqual([
+      '<think>\nFirst round\n\nStill thinking',
+      '<thinking>\nSecond round\n</thinking>',
+    ]);
   });
 
   it('implicitly closes when second open tag is inline (e.g. <think>content)', () => {
