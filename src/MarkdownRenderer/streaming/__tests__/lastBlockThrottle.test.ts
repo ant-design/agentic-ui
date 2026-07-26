@@ -55,4 +55,28 @@ describe('shouldReparseLastBlock', () => {
     const next = '| a | b |\n| - | - |\n| 1 | [link';
     expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
   });
+
+  it('未闭合 think 内换行应立即重 parse', () => {
+    const prev = '<think>\nreasoning';
+    const next = '<think>\nreasoning\nmore';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
+  });
+
+  it('未闭合 think 闭合标签出现时应立即重 parse', () => {
+    const prev = '<think>\nreasoning';
+    const next = '<think>\nreasoning</think>';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
+  });
+
+  it('未闭合 think 内小增量字母仍按字符节流', () => {
+    const prev = '<think>\nreasoning';
+    const next = '<think>\nreasoningx';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(false);
+  });
+
+  it('thinking 别名闭合时也应立即重 parse', () => {
+    const prev = '<thinking>\nstep';
+    const next = '<thinking>\nstep</thinking>';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
+  });
 });
