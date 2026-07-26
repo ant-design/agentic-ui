@@ -116,6 +116,14 @@ describe('splitMarkdownBlocks', () => {
     expect(result[1]).toBe('| a | b |\n| - | - |\n| 1 | 2 |');
   });
 
+  it('splits heading from following pipe-less table without blank line', () => {
+    const md = '# Title\na | b\n- | -\n1 | 2';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('# Title');
+    expect(result[1]).toBe('a | b\n- | -\n1 | 2');
+  });
+
   it('does not split inside <think> tags with blank lines', () => {
     const md =
       '<think>\nHere is thinking:\n\n1. Step one\n\n2. Step two\n</think>\n\nResponse text.';
@@ -201,22 +209,329 @@ describe('splitMarkdownBlocks', () => {
     expect(result[1]).toBe('回复。');
   });
 
-  it('splits leading paragraph before think block at blank line boundary', () => {
-    const md = 'Leading answer setup\n\n<think>\nStep 1\n\nStep 2\n</think>';
+  // ================================================================
+  // 场景 1： 闭标签后同帧紧跟正文，强制切块
+  // ================================================================
+  it('splits block when </think> close tag is followed by content on same line', () => {
+    // 闭标签和 URL 在同一行到达（模型输出的流式帧）
+    const md = '<think>\n思考内容\n</think>\nhttp://example.com/resource';
     const result = splitMarkdownBlocks(md);
-    expect(result).toEqual([
-      'Leading answer setup',
-      '<think>\nStep 1\n\nStep 2\n</think>',
-    ]);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考内容\n</think>');
+    expect(result[1]).toBe('http://example.com/resource');
   });
 
-  it('does not treat think tags inside code fences as think context', () => {
-    const md = '```\n<thinking>\n\nfoo\n</thinking>\n```\n\nAfter';
+  it('splits block when close tag and content arrive on same line (inline close)', () => {
+    // 行内闭标签，闭标签后紧接正文
+    const md = '<think>\n思考内容\n</think>http://example.com/resource';
     const result = splitMarkdownBlocks(md);
-    expect(result).toEqual([
-      '```\n<thinking>\n\nfoo\n</thinking>\n```',
-      'After',
-    ]);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考内容\n</think>');
+    expect(result[1]).toBe('http://example.com/resource');
+  });
+
+  it('splits block when close tag is followed by content with space', () => {
+    // 行内闭标签后有空格和正文
+    const md = '<think>\n思考内容\n</think> Some text after think';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考内容\n</think>');
+    expect(result[1]).toBe(' Some text after think');
+  });
+
+  it('splits block for <thinking> close tag followed by content', () => {
+    const md = '<thinking>\n思考\n</thinking>\nResponse text here';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<thinking>\n思考\n</thinking>');
+    expect(result[1]).toBe('Response text here');
+  });
+
+  it('keeps normal think block intact when close tag is on its own line followed by blank line', () => {
+    // 闭标签独占一行 + 空行 = 正常情况，已有测试覆盖
+    const md = '<think>\n思考内容\n</think>\n\n正文内容';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考内容\n</think>');
+    expect(result[1]).toBe('正文内容');
+  });
+
+  // ================================================================
+  // 场景 2：第一个 think 块无闭标签，第二个  开标签到达 → 隐式关闭
+  // ================================================================
+  it('implicitly closes first think block when second open tag arrives', () => {
+    // 第一轮思考无闭标签，第二轮思考直接开始
+    const md =
+      '<think>\nFirst think content\n<think>\nSecond think content\n</think>';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\nFirst think content');
+    expect(result[1]).toBe('<think>\nSecond think content\n</think>');
+  });
+
+  it('implicitly closes first thinking block when second open tag arrives', () => {
+    const md = '<thinking>\nFirst round\n<thinking>\nSecond round\n</thinking>';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<thinking>\nFirst round');
+    expect(result[1]).toBe('<thinking>\nSecond round\n</thinking>');
+  });
+
+  it('implicitly closes when second open tag is inline (e.g. <think>content)', () => {
+    // 第二个开标签是行内形式
+    const md = '<think>\nFirst think\n<think>Second think\n</think>';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\nFirst think');
+    expect(result[1]).toBe('<think>Second think\n</think>');
+  });
+
+  it('handles streaming scenario: unclosed think then new think then close', () => {
+    // 模拟 SSE 流式场景：第一轮思考无闭标签，直接开始第二轮
+    const md =
+      '<think>\n用户要求生成代码\n我需要考虑性能\n<think>\n让我重新思考\n优化方案\n</think>\n\n最终回复内容';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(3);
+    expect(result[0]).toBe('<think>\n用户要求生成代码\n我需要考虑性能');
+    expect(result[1]).toBe('<think>\n让我重新思考\n优化方案\n</think>');
+    expect(result[2]).toBe('最终回复内容');
+  });
+
+  it('handles two think blocks with close tags followed by content', () => {
+    // 两个完整的 think 块 + 正文，验证组合场景
+    const md =
+      '<think>\nFirst\n</think>\n<think>\nSecond\n</think>\n\nAfter both';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(3);
+    expect(result[0]).toBe('<think>\nFirst\n</think>');
+    expect(result[1]).toBe('<think>\nSecond\n</think>');
+    expect(result[2]).toBe('After both');
+  });
+
+  // ================================================================
+  // 场景 3 回归验证：inThinkTag 内 \n\n 不应切块（闭标签未到达）
+  // ================================================================
+  it('does not split on blank lines inside unclosed think tag (streaming)', () => {
+    // 闭标签还没到，中间有多个 \n\n，整个应该保持为一个 block
+    const md = '<think>\nStep one\n\nStep two\n\nStep three';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(1);
+    expect(result[0]).toBe('<think>\nStep one\n\nStep two\n\nStep three');
+  });
+
+  it('does not split on blank lines inside unclosed <thinking> tag (streaming)', () => {
+    const md =
+      '<thinking>\nReasoning part 1\n\nReasoning part 2\n\nContinuing...';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(1);
+    expect(result[0]).toBe(
+      '<thinking>\nReasoning part 1\n\nReasoning part 2\n\nContinuing...',
+    );
+  });
+
+  it('keeps blank lines in think context and splits correctly after close', () => {
+    // 流式中态：闭标签到达时，think 块内含 \n\n，闭标签后正文独立
+    const md = '<think>\nPart 1\n\nPart 2\n</think>\nResponse after think';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\nPart 1\n\nPart 2\n</think>');
+    expect(result[1]).toBe('Response after think');
+  });
+
+  it('does not split on "link. blank-blank" inside unclosed <thinking> (user scenario)', () => {
+    // 用户反馈：深度思考渲染一段内容后出现 "link." + \n\n 就导致渲染提前结束
+    const md = '<thinking>\nAnalyzing\n\nVisit link.\n\nContinuing think';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(1);
+    expect(result[0]).toBe(
+      '<thinking>\nAnalyzing\n\nVisit link.\n\nContinuing think',
+    );
+  });
+
+  it('think block with multiple link-style blank lines stays intact until close', () => {
+    // 模拟完整 SSE 累积：多个 "link.\n\n" 风格空行
+    const md =
+      '<thinking>\nStep 1\n\nVisit http://link.\n\nStep 2\n\nAnother ref.\n\nStep 3\n</thinking>\n\nFinal answer';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe(
+      '<thinking>\nStep 1\n\nVisit http://link.\n\nStep 2\n\nAnother ref.\n\nStep 3\n</thinking>',
+    );
+    expect(result[1]).toBe('Final answer');
+  });
+
+  it('unclosed think with link and blank line stays as single block', () => {
+    const md = '<think>\nAnalyzing\n\nVisit link.\n\nContinuing think';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(1);
+    expect(result[0]).toBe(
+      '<think>\nAnalyzing\n\nVisit link.\n\nContinuing think',
+    );
+  });
+
+  // ================================================================
+  // 场景 4：行内闭标签后下一行紧跟内容（无空行），应强制分块
+  // ================================================================
+  it('splits block when inline close tag is at end of line followed by content on next line', () => {
+    // 闭标签紧跟在正文后面（如 "构造调用。</think>"），下一行是正文
+    const md = '<think>\n思考1\n构造调用。</think>\nhttp://example.com';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考1\n构造调用。</think>');
+    expect(result[1]).toBe('http://example.com');
+  });
+
+  it('splits block when inline close tag is at end of line and next line is new think open', () => {
+    // 行内闭标签后，下一行是新的 think 开标签
+    const md =
+      '<think>\n思考1\n构造调用。</think>\n<think>\n思考2\n回复内容。</think>';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考1\n构造调用。</think>');
+    expect(result[1]).toBe('<think>\n思考2\n回复内容。</think>');
+  });
+
+  it('handles two inline close tags with content after second', () => {
+    // 两段都是行内闭标签 + 最后一行正文
+    const md =
+      '<think>\n思考1\n构造调用。</think>\n<think>\n思考2\n回复内容。</think>\nhttp://example.com';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(3);
+    expect(result[0]).toBe('<think>\n思考1\n构造调用。</think>');
+    expect(result[1]).toBe('<think>\n思考2\n回复内容。</think>');
+    expect(result[2]).toBe('http://example.com');
+  });
+
+  it('does not split when inline close tag is followed by content on same line', () => {
+    // 闭标签和 URL 在同一行到达（已有测试的补充确认）
+    const md = '<think>\n思考内容</think>http://example.com';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toContain('</think>');
+    expect(result[1]).toBe('http://example.com');
+  });
+
+  // ================================================================
+  // 场景 4 扩展：<thinking> / <redacted_thinking> 行内闭标签
+  // ================================================================
+  it('splits block when inline </thinking> close tag at end of line followed by content', () => {
+    const md =
+      '<thinking>\n思考内容\n构造调用。</thinking>\nhttp://example.com';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<thinking>\n思考内容\n构造调用。</thinking>');
+    expect(result[1]).toBe('http://example.com');
+  });
+
+  it('splits block when inline </redacted_thinking> close tag at end of line followed by content', () => {
+    const md =
+      '<redacted_thinking>\n推理\n结论。</redacted_thinking>\nOutput text';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe(
+      '<redacted_thinking>\n推理\n结论。</redacted_thinking>',
+    );
+    expect(result[1]).toBe('Output text');
+  });
+
+  // ================================================================
+  // 场景 4 扩展：行内闭标签后跟不同类型内容
+  // ================================================================
+  it('splits block when inline close tag is followed by markdown heading', () => {
+    const md = '<think>\n思考内容\n结束。</think>\n## Heading';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考内容\n结束。</think>');
+    expect(result[1]).toBe('## Heading');
+  });
+
+  it('splits block when inline close tag is followed by list item', () => {
+    const md = '<think>\n思考内容\n结束。</think>\n- List item';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考内容\n结束。</think>');
+    expect(result[1]).toBe('- List item');
+  });
+
+  it('splits block when inline close tag is followed by code fence', () => {
+    const md =
+      '<think>\n思考内容\n结束。</think>\n```js\nconsole.log("hello")\n```';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考内容\n结束。</think>');
+    expect(result[1]).toBe('```js\nconsole.log("hello")\n```');
+  });
+
+  // ================================================================
+  // 场景 4 扩展：流式中间态组合
+  // ================================================================
+  it('handles unclosed think then inline close on next think open', () => {
+    // 第一段 think 无闭标签，第二段 think 开标签到来时隐式关闭
+    // 然后第二段的闭标签是行内的
+    const md =
+      '<think>\n第一段思考</think>\n<think>\n第二段思考\n回复内容。</think>\n正文';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(3);
+    expect(result[0]).toBe('<think>\n第一段思考</think>');
+    expect(result[1]).toBe('<think>\n第二段思考\n回复内容。</think>');
+    expect(result[2]).toBe('正文');
+  });
+
+  it('handles inline close with blank lines inside think content', () => {
+    // think 内容中有空行，行内闭标签在行末
+    const md = '<think>\nStep 1\n\nStep 2\n结束。</think>\nResponse';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\nStep 1\n\nStep 2\n结束。</think>');
+    expect(result[1]).toBe('Response');
+  });
+
+  // ================================================================
+  // 场景 4 扩展：边界情况
+  // ================================================================
+  it('handles empty think content with inline close tag', () => {
+    // think 开标签后紧跟行内闭标签（几乎无内容）
+    const md = '<think>\n</think>\n正文内容';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n</think>');
+    expect(result[1]).toBe('正文内容');
+  });
+
+  it('handles inline close tag followed by blank line then content', () => {
+    // 行内闭标签后有空行再跟正文（空行不应产生额外 block）
+    const md = '<think>\n思考内容\n结束。</think>\n\n正文内容';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(2);
+    expect(result[0]).toBe('<think>\n思考内容\n结束。</think>');
+    expect(result[1]).toBe('正文内容');
+  });
+
+  it('handles SSE stream pattern: inline close + new open + inline close + URL', () => {
+    // 完整复现 SSE 错误数据模式：
+    // 第一段：行内闭标签 "构造调用。"
+    // 第二段：行内闭标签 "回复内容。"
+    // 最后一行：URL 正文
+    const md =
+      '<think>\n用户要求将JSON转换为Excel\n构造调用。</think>\n<think>\n用户要求将JSON转换\n已经调用了工具\n回复内容应包含链接。</think>\nhttp://agentar-lite.cnstack.local/file.xlsx';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(3);
+    expect(result[0]).toContain('</think>');
+    expect(result[0]).toContain('构造调用');
+    expect(result[1]).toContain('</think>');
+    expect(result[1]).toContain('回复内容');
+    expect(result[2]).toBe('http://agentar-lite.cnstack.local/file.xlsx');
+  });
+
+  it('handles <thinking> inline close then normal close think', () => {
+    // 混合标签变体：thinking 行内闭标签 + think 独占闭标签
+    const md =
+      '<thinking>\n推理过程\n结论。</thinking>\n<think>\n第二步思考\n</think>\n\n最终结果';
+    const result = splitMarkdownBlocks(md);
+    expect(result.length).toBe(3);
+    expect(result[0]).toBe('<thinking>\n推理过程\n结论。</thinking>');
+    expect(result[1]).toBe('<think>\n第二步思考\n</think>');
+    expect(result[2]).toBe('最终结果');
   });
 });
 

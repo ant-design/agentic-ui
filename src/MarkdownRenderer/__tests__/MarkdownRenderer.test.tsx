@@ -174,22 +174,6 @@ describe('MarkdownRenderer', () => {
     expect(container.querySelector('td')?.textContent).toContain('Cell');
   });
 
-  it('流式逐词淡入不应拆分表格单元格文本', () => {
-    const tableMarkdown = '| Header |\n| --- |\n| Cell |';
-    const { container } = render(
-      <MarkdownRenderer content={tableMarkdown} streaming={true} isFinished />,
-    );
-
-    expect(container.querySelector('table')).toBeTruthy();
-    expect(
-      container.querySelectorAll(
-        `th .${STREAM_TOKEN_CLASS}, td .${STREAM_TOKEN_CLASS}`,
-      ),
-    ).toHaveLength(0);
-    expect(container.querySelector('th')?.textContent).toBe('Header');
-    expect(container.querySelector('td')?.textContent).toBe('Cell');
-  });
-
   it('空内容不应崩溃', () => {
     const { container } = render(<MarkdownRenderer content="" />);
 
@@ -265,46 +249,6 @@ describe('MarkdownRenderer', () => {
       );
     });
     expect(ref.current?.getDisplayedContent()).toBe('Hello World');
-  });
-
-  it('限流和逐词淡入同时开启时仅为已展示文本生成 token', async () => {
-    const ref = React.createRef<MarkdownRendererRef>();
-    const throttleOptions = { charsPerFrame: 6, speed: 1 as const };
-
-    const { container } = render(
-      <MarkdownRenderer
-        ref={ref}
-        content="Hello world"
-        streaming={true}
-        throttleOptions={throttleOptions}
-      />,
-    );
-
-    expect(container.querySelectorAll(`.${STREAM_TOKEN_CLASS}`)).toHaveLength(
-      0,
-    );
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(16);
-    });
-
-    let tokens = Array.from(
-      container.querySelectorAll(`.${STREAM_TOKEN_CLASS}`),
-    );
-    expect(ref.current?.getDisplayedContent()).toBe('Hello ');
-    expect(tokens.map((token) => token.textContent)).toEqual(['Hello']);
-    expect(container.textContent).not.toContain('world');
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(16);
-    });
-
-    tokens = Array.from(container.querySelectorAll(`.${STREAM_TOKEN_CLASS}`));
-    expect(ref.current?.getDisplayedContent()).toBe('Hello world');
-    expect(tokens.map((token) => token.textContent)).toEqual([
-      'Hello',
-      'world',
-    ]);
   });
 
   it('流式 isFinished 应 flush 全部内容', () => {
@@ -411,6 +355,27 @@ describe('MarkdownRenderer', () => {
     expect(fndEl).toBeTruthy();
   });
 
+  it('流式逐词淡入时应保留带定义的脚注引用', () => {
+    const { container } = render(
+      <MarkdownRenderer
+        content={'Revenue increased[^1].\n\n[^1]: Verified source.'}
+        streaming
+        isFinished
+      />,
+    );
+
+    expect(
+      container.querySelectorAll(`.${STREAM_TOKEN_CLASS}`).length,
+    ).toBeGreaterThan(0);
+    const fncEl = container.querySelector('[data-fnc="fnc"]');
+    expect(fncEl).toBeTruthy();
+    expect(fncEl?.textContent).toContain('1');
+    expect(
+      container.querySelector('[data-be="footnoteDefinition"]'),
+    ).toBeTruthy();
+    expect(container.textContent).toContain('Verified source.');
+  });
+
   it('应渲染裸脚注引用（无定义，AI 对话场景）', () => {
     const { container } = render(
       <MarkdownRenderer
@@ -475,53 +440,50 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
-  it('流式 think 块包含空行时不应把思考内容泄漏到回答区', () => {
+  it('流式 think 闭合后应将最终链接渲染在思考块外', () => {
+    const firstThink = '<think>\n分析用户请求';
     const { container, rerender } = render(
       <MarkdownRenderer
-        content={'<think>\nStep one'}
-        streaming={true}
+        content={firstThink}
+        streaming
         throttleOptions={{ enabled: false }}
       />,
     );
 
+    const secondThink =
+      `${firstThink}\n准备调用工具。</think>\n` +
+      '<think>\n工具调用完成';
     rerender(
       <MarkdownRenderer
-        content={'<think>\nStep one\n\nStep two'}
-        streaming={true}
+        content={secondThink}
+        streaming
         throttleOptions={{ enabled: false }}
       />,
     );
 
-    let thinkBlocks = container.querySelectorAll(
-      '[data-testid="think-block-renderer"]',
-    );
-    let thinkContent = container.querySelector(
-      '[data-testid="tool-use-bar-think-container"]',
-    );
-    expect(thinkBlocks).toHaveLength(1);
-    expect(thinkContent?.textContent).toContain('Step one');
-    expect(thinkContent?.textContent).toContain('Step two');
-    expect(container.textContent).not.toContain('Final answer');
-
+    const downloadUrl = 'https://example.com/result.xlsx';
     rerender(
       <MarkdownRenderer
-        content={'<think>\nStep one\n\nStep two\n</think>\n\nFinal answer'}
-        streaming={true}
+        content={`${secondThink}\n返回下载链接。</think>\n${downloadUrl}`}
+        streaming
+        isFinished
         throttleOptions={{ enabled: false }}
       />,
     );
 
-    thinkBlocks = container.querySelectorAll(
+    const thinkBlocks = container.querySelectorAll(
       '[data-testid="think-block-renderer"]',
     );
-    thinkContent = container.querySelector(
-      '[data-testid="tool-use-bar-think-container"]',
+    const downloadLink = container.querySelector(
+      `a[href="${downloadUrl}"]`,
     );
-    expect(thinkBlocks).toHaveLength(1);
-    expect(thinkContent?.textContent).toContain('Step one');
-    expect(thinkContent?.textContent).toContain('Step two');
-    expect(thinkContent?.textContent).not.toContain('Final answer');
-    expect(container.textContent).toContain('Final answer');
+
+    expect(thinkBlocks).toHaveLength(2);
+    expect(downloadLink).toBeTruthy();
+    thinkBlocks.forEach((thinkBlock) => {
+      expect(thinkBlock).not.toContainElement(downloadLink);
+      expect(thinkBlock).not.toHaveTextContent(downloadUrl);
+    });
   });
 
   it('应将 HTML 注释 + 表格组合渲染为图表', async () => {

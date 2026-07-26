@@ -4,11 +4,12 @@
  * 测试安全上下文管理器的功能，包括权限控制、资源限制、监控等。
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   SecurityContextManager,
   createSecurityContextManager,
   runInSecureContext,
+  type ExecutionContext,
 } from '../../proxySandbox/SecurityContextManager';
 
 describe('SecurityContextManager', () => {
@@ -551,6 +552,115 @@ describe('错误处理和边界情况测试', () => {
       const value = manager.getContextVariable('non-existent', 'testVar');
       expect(value).toBeUndefined();
 
+      manager.destroy();
+    });
+  });
+
+  describe('资源限制与监控分支', () => {
+    it('enableResourceMonitoring=false 时 wrapCodeWithMonitoring 原样返回', () => {
+      const manager = new SecurityContextManager({
+        monitoring: { enableResourceMonitoring: false },
+      });
+
+      const code = 'return 1 + 1';
+      expect((manager as any).wrapCodeWithMonitoring(code)).toBe(code);
+      manager.destroy();
+    });
+
+    it('executionTime 超限时抛出错误', () => {
+      const manager = new SecurityContextManager({
+        limits: { maxExecutionTime: 100 },
+      });
+
+      const context: ExecutionContext = {
+        id: 'test',
+        createdAt: Date.now(),
+        scope: {},
+        permissions: (manager as any).config.permissions,
+        resourceUsage: {
+          memoryUsage: 0,
+          executionTime: 200,
+          callStackDepth: 0,
+          loopIterations: 0,
+        },
+      };
+
+      expect(() => (manager as any).checkResourceLimits(context)).toThrow(
+        'Execution time limit exceeded',
+      );
+      manager.destroy();
+    });
+
+    it('memoryUsage 超限时抛出错误', () => {
+      const manager = new SecurityContextManager({
+        limits: { maxMemoryUsage: 1000 },
+      });
+
+      const context: ExecutionContext = {
+        id: 'test',
+        createdAt: Date.now(),
+        scope: {},
+        permissions: (manager as any).config.permissions,
+        resourceUsage: {
+          memoryUsage: 2000,
+          executionTime: 0,
+          callStackDepth: 0,
+          loopIterations: 0,
+        },
+      };
+
+      expect(() => (manager as any).checkResourceLimits(context)).toThrow(
+        'Memory usage limit exceeded',
+      );
+      manager.destroy();
+    });
+
+    it('callStackDepth 超限时抛出错误', () => {
+      const manager = new SecurityContextManager({
+        limits: { maxCallStackDepth: 10 },
+      });
+
+      const context: ExecutionContext = {
+        id: 'test',
+        createdAt: Date.now(),
+        scope: {},
+        permissions: (manager as any).config.permissions,
+        resourceUsage: {
+          memoryUsage: 0,
+          executionTime: 0,
+          callStackDepth: 50,
+          loopIterations: 0,
+        },
+      };
+
+      expect(() => (manager as any).checkResourceLimits(context)).toThrow(
+        'Call stack depth limit exceeded',
+      );
+      manager.destroy();
+    });
+
+    it('性能监控 measure 失败时 console.warn', () => {
+      const manager = new SecurityContextManager({
+        monitoring: { enablePerformanceMonitoring: true },
+      });
+
+      const perfMonitor = (manager as any).globalMonitors.get('performance');
+      const measureSpy = vi
+        .spyOn(performance, 'measure')
+        .mockImplementation(() => {
+          throw new Error('measure error');
+        });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      perfMonitor.measure('fail', 'noexist1', 'noexist2');
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Performance measurement failed:',
+        expect.any(Error),
+      );
+
+      measureSpy.mockRestore();
+      warnSpy.mockRestore();
       manager.destroy();
     });
   });

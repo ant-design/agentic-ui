@@ -186,10 +186,32 @@ describe('SuggestionList 组件', () => {
     );
 
     const moreIcon = container.querySelector('.ant-follow-up-more-icon');
-    if (moreIcon) {
-      fireEvent.click(moreIcon);
-      expect(handleMore).toHaveBeenCalledTimes(1);
-    }
+    expect(moreIcon).toBeTruthy();
+    fireEvent.click(moreIcon as Element);
+    expect(handleMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('应该通过 Enter/Space 键盘触发搜索更多', () => {
+    const handleMore = vi.fn();
+
+    const { container } = render(
+      <SuggestionList
+        items={mockItems}
+        showMore={{ enable: true, onClick: handleMore }}
+      />,
+    );
+
+    const moreIcon = container.querySelector(
+      '.ant-follow-up-more-icon',
+    ) as HTMLElement;
+    expect(moreIcon).toBeTruthy();
+
+    fireEvent.keyDown(moreIcon, { key: 'Enter' });
+    expect(handleMore).toHaveBeenCalledTimes(1);
+
+    handleMore.mockClear();
+    fireEvent.keyDown(moreIcon, { key: ' ' });
+    expect(handleMore).toHaveBeenCalledTimes(1);
   });
 
   it('应该支持自定义"搜索更多"图标', () => {
@@ -376,5 +398,46 @@ describe('SuggestionList 组件', () => {
     );
 
     expect(container.querySelector('.ant-follow-up-label')).toBeTruthy();
+  });
+
+  it('应该通过 Enter/Space 键盘选择建议项', async () => {
+    const handleClick = vi.fn();
+
+    render(
+      <SuggestionList
+        items={[{ key: '1', text: '键盘项' }]}
+        onItemClick={handleClick}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: /选择建议：键盘项/ });
+
+    await act(async () => {
+      fireEvent.keyDown(button, { key: 'Enter' });
+      await Promise.resolve();
+    });
+    expect(handleClick).toHaveBeenCalledWith('键盘项');
+
+    handleClick.mockClear();
+    await act(async () => {
+      fireEvent.keyDown(button, { key: ' ' });
+      await Promise.resolve();
+    });
+    expect(handleClick).toHaveBeenCalledWith('键盘项');
+  });
+
+  it('禁用项 keyboard 不应触发 onItemClick', () => {
+    const handleClick = vi.fn();
+
+    render(
+      <SuggestionList
+        items={[{ key: 'd', text: '禁用键盘', disabled: true }]}
+        onItemClick={handleClick}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: /选择建议：禁用键盘/ });
+    fireEvent.keyDown(button, { key: 'Enter' });
+    expect(handleClick).not.toHaveBeenCalled();
   });
 });
