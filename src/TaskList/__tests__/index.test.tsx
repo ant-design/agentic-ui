@@ -888,6 +888,27 @@ describe('TaskList', () => {
       });
     });
 
+    it('loading=true 且无任务项时摘要显示进行中', () => {
+      render(<TaskList items={[]} variant="simple" loading={true} />);
+
+      expect(screen.getByText('正在进行任务')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('task-list-simple-summary-status-loading'),
+      ).toBeInTheDocument();
+    });
+
+    it('点击箭头 ActionIconBox 应展开任务列表', async () => {
+      render(<TaskList items={simpleItems} variant="simple" />);
+
+      const bar = screen.getByTestId('task-list-simple-bar');
+      const arrowBox = within(bar).getByTestId('action-icon-box');
+      fireEvent.click(arrowBox);
+
+      await waitFor(() => {
+        expect(screen.getByText('Completed Task')).toBeInTheDocument();
+      });
+    });
+
     it('再次点击摘要条应收起任务列表', async () => {
       render(<TaskList items={simpleItems} variant="simple" />);
 

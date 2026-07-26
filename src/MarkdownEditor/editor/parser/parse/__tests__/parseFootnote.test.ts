@@ -15,6 +15,19 @@ describe('parseFootnote', () => {
     });
   });
 
+  it('footnoteReferenceToTextLeaf falls back to label and empty text', () => {
+    expect(footnoteReferenceToTextLeaf({ label: 'note' })).toEqual({
+      text: '[^note]',
+      identifier: 'note',
+      fnc: true,
+    });
+    expect(footnoteReferenceToTextLeaf({})).toEqual({
+      text: '',
+      identifier: undefined,
+      fnc: true,
+    });
+  });
+
   it('legacyFootnoteReferenceElementToTextLeaf reads identifier', () => {
     expect(
       legacyFootnoteReferenceElementToTextLeaf({
@@ -24,6 +37,40 @@ describe('parseFootnote', () => {
     ).toEqual({
       text: '[^2]',
       identifier: '2',
+      fnc: true,
+    });
+  });
+
+  it('legacyFootnoteReferenceElementToTextLeaf parses text and children', () => {
+    expect(
+      legacyFootnoteReferenceElementToTextLeaf({
+        text: '[^from-text]',
+      }),
+    ).toEqual({
+      text: '[^from-text]',
+      identifier: 'from-text',
+      fnc: true,
+    });
+    expect(
+      legacyFootnoteReferenceElementToTextLeaf({
+        children: [{ text: '[^child]' }],
+      } as any),
+    ).toEqual({
+      text: '[^child]',
+      identifier: 'child',
+      fnc: true,
+    });
+  });
+
+  it('legacyFootnoteReferenceElementToTextLeaf prefers identifier over parsed text', () => {
+    expect(
+      legacyFootnoteReferenceElementToTextLeaf({
+        identifier: 'id-first',
+        text: '[^from-text]',
+      }),
+    ).toEqual({
+      text: '[^id-first]',
+      identifier: 'id-first',
       fnc: true,
     });
   });

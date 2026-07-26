@@ -110,6 +110,49 @@ describe('PureBubble', () => {
     expect(screen.getByText('Test message content')).toBeInTheDocument();
   });
 
+  it('should fall back when BubbleConfigContext is missing', () => {
+    render(
+      <ConfigProvider>
+        <PureBubble {...defaultProps} />
+      </ConfigProvider>,
+    );
+
+    expect(screen.getByText('Test message content')).toBeInTheDocument();
+  });
+
+  it('should treat non-string originData.content as empty markdown', () => {
+    render(
+      <BubbleConfigProvide>
+        <PureBubble
+          {...defaultProps}
+          originData={{
+            ...defaultProps.originData,
+            content: { blocks: [] } as unknown as string,
+          }}
+        />
+      </BubbleConfigProvide>,
+    );
+
+    expect(screen.queryByText('Test message content')).not.toBeInTheDocument();
+  });
+
+  it('should prefer originData.createAt over props.time', () => {
+    render(
+      <BubbleConfigProvide>
+        <PureBubble
+          {...defaultProps}
+          time={1}
+          originData={{
+            ...defaultProps.originData,
+            createAt: 999999,
+          }}
+        />
+      </BubbleConfigProvide>,
+    );
+
+    expect(screen.getByText('Test message content')).toBeInTheDocument();
+  });
+
   it('should get prefix class', () => {
     render(
       <BubbleConfigProvide>
@@ -252,6 +295,47 @@ describe('PureBubble', () => {
     );
 
     expect(screen.getByText('Test message content')).toBeInTheDocument();
+    expect(screen.queryByTestId('message-before')).not.toBeInTheDocument();
+  });
+
+  it('should render contentBeforeRender output inside message-before', () => {
+    render(
+      <BubbleConfigProvide>
+        <PureBubble
+          {...defaultProps}
+          bubbleRenderConfig={{
+            contentBeforeRender: () => (
+              <div data-testid="custom-before">Before content</div>
+            ),
+          }}
+        />
+      </BubbleConfigProvide>,
+    );
+
+    expect(screen.getByTestId('message-before')).toBeInTheDocument();
+    expect(screen.getByTestId('custom-before')).toBeInTheDocument();
+  });
+
+  it('should render custom header with right placement via bubbleRenderConfig.render', () => {
+    render(
+      <BubbleConfigProvide>
+        <PureBubble
+          {...defaultProps}
+          placement="right"
+          bubbleRenderConfig={{
+            render: (_props, slots) => (
+              <div data-testid="custom-layout">
+                {slots.header}
+                {slots.messageContent}
+              </div>
+            ),
+          }}
+        />
+      </BubbleConfigProvide>,
+    );
+
+    expect(screen.getByTestId('custom-layout')).toBeInTheDocument();
+    expect(screen.getByText('Test message content')).toBeInTheDocument();
   });
 
   it('should render contentAfterDom as null by default', () => {
@@ -292,8 +376,17 @@ describe('PureBubble', () => {
     readonly: false,
     originData: {
       ...defaultProps.originData,
+      role: 'assistant' as const,
       isFinished: true,
       extra: {},
+    },
+    bubbleRenderConfig: {
+      render: (_props: unknown, slots: { extra?: React.ReactNode; messageContent?: React.ReactNode }) => (
+        <div data-testid="pure-bubble-render">
+          {slots.messageContent}
+          {slots.extra}
+        </div>
+      ),
     },
   };
 
@@ -313,16 +406,37 @@ describe('PureBubble', () => {
       </BubbleConfigProvide>,
     );
 
-    const dislikeButton = screen.queryByTestId('dislike-button');
-    if (dislikeButton) {
-      fireEvent.click(dislikeButton);
-      await waitFor(() => {
-        expect(onDisLike).toHaveBeenCalledWith(feedbackEnabledProps.originData);
-        expect(setMessageItem).toHaveBeenCalledWith('bubble-id', {
-          feedback: 'thumbsDown',
-        });
+    const dislikeButton = screen.getByTestId('dislike-button');
+    fireEvent.click(dislikeButton);
+    await waitFor(() => {
+      expect(onDisLike).toHaveBeenCalledWith(feedbackEnabledProps.originData);
+      expect(setMessageItem).toHaveBeenCalledWith('bubble-id', {
+        feedback: 'thumbsDown',
       });
-    }
+    });
+  });
+
+  it('should handle onDisLike success without id and skip setMessageItem', async () => {
+    const setMessageItem = vi.fn();
+    const mockBubbleRef = { current: { setMessageItem } };
+    const onDisLike = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <BubbleConfigProvide>
+        <PureBubble
+          {...feedbackEnabledProps}
+          onDisLike={onDisLike}
+          bubbleRef={mockBubbleRef as any}
+        />
+      </BubbleConfigProvide>,
+    );
+
+    fireEvent.click(screen.getByTestId('dislike-button'));
+
+    await waitFor(() => {
+      expect(onDisLike).toHaveBeenCalledWith(feedbackEnabledProps.originData);
+    });
+    expect(setMessageItem).not.toHaveBeenCalled();
   });
 
   it('should handle onDisLike reject and swallow error', async () => {
@@ -341,12 +455,9 @@ describe('PureBubble', () => {
       </BubbleConfigProvide>,
     );
 
-    const dislikeButton = screen.queryByTestId('dislike-button');
-    if (dislikeButton) {
-      fireEvent.click(dislikeButton);
-      await waitFor(() => expect(onDisLike).toHaveBeenCalled());
-      expect(setMessageItem).not.toHaveBeenCalled();
-    }
+    fireEvent.click(screen.getByTestId('dislike-button'));
+    await waitFor(() => expect(onDisLike).toHaveBeenCalled());
+    expect(setMessageItem).not.toHaveBeenCalled();
   });
 
   it('should handle onDislike success and call setMessageItem with thumbsDown', async () => {
@@ -365,16 +476,13 @@ describe('PureBubble', () => {
       </BubbleConfigProvide>,
     );
 
-    const dislikeButton = screen.queryByTestId('dislike-button');
-    if (dislikeButton) {
-      fireEvent.click(dislikeButton);
-      await waitFor(() => {
-        expect(onDislike).toHaveBeenCalledWith(feedbackEnabledProps.originData);
-        expect(setMessageItem).toHaveBeenCalledWith('bubble-id', {
-          feedback: 'thumbsDown',
-        });
+    fireEvent.click(screen.getByTestId('dislike-button'));
+    await waitFor(() => {
+      expect(onDislike).toHaveBeenCalledWith(feedbackEnabledProps.originData);
+      expect(setMessageItem).toHaveBeenCalledWith('bubble-id', {
+        feedback: 'thumbsDown',
       });
-    }
+    });
   });
 
   it('should handle onDislike reject and swallow error', async () => {
@@ -386,11 +494,8 @@ describe('PureBubble', () => {
       </BubbleConfigProvide>,
     );
 
-    const dislikeButton = screen.queryByTestId('dislike-button');
-    if (dislikeButton) {
-      fireEvent.click(dislikeButton);
-      await waitFor(() => expect(onDislike).toHaveBeenCalled());
-    }
+    fireEvent.click(screen.getByTestId('dislike-button'));
+    await waitFor(() => expect(onDislike).toHaveBeenCalled());
   });
 
   it('should handle onLike success and call setMessageItem with thumbsUp', async () => {
@@ -409,16 +514,13 @@ describe('PureBubble', () => {
       </BubbleConfigProvide>,
     );
 
-    const likeButton = screen.queryByTestId('like-button');
-    if (likeButton) {
-      fireEvent.click(likeButton);
-      await waitFor(() => {
-        expect(onLike).toHaveBeenCalledWith(feedbackEnabledProps.originData);
-        expect(setMessageItem).toHaveBeenCalledWith('bubble-id', {
-          feedback: 'thumbsUp',
-        });
+    fireEvent.click(screen.getByTestId('like-button'));
+    await waitFor(() => {
+      expect(onLike).toHaveBeenCalledWith(feedbackEnabledProps.originData);
+      expect(setMessageItem).toHaveBeenCalledWith('bubble-id', {
+        feedback: 'thumbsUp',
       });
-    }
+    });
   });
 
   it('should handle onLike reject and swallow error', async () => {
@@ -430,11 +532,8 @@ describe('PureBubble', () => {
       </BubbleConfigProvide>,
     );
 
-    const likeButton = screen.queryByTestId('like-button');
-    if (likeButton) {
-      fireEvent.click(likeButton);
-      await waitFor(() => expect(onLike).toHaveBeenCalled());
-    }
+    fireEvent.click(screen.getByTestId('like-button'));
+    await waitFor(() => expect(onLike).toHaveBeenCalled());
   });
 
   it('should handle onDislike error gracefully', async () => {
@@ -443,24 +542,15 @@ describe('PureBubble', () => {
 
     render(
       <BubbleConfigProvide>
-        <PureBubble
-          {...defaultProps}
-          onDislike={onDislike}
-          originData={{
-            ...defaultProps.originData,
-            feedback: 'thumbsUp',
-          }}
-        />
+        <PureBubble {...feedbackEnabledProps} onDislike={onDislike} />
       </BubbleConfigProvide>,
     );
 
-    const dislikeButton = screen.queryByTestId('dislike-button');
-    if (dislikeButton) {
-      fireEvent.click(dislikeButton);
-      await waitFor(() => {
-        expect(onDislike).toHaveBeenCalled();
-      });
-    }
+    fireEvent.click(screen.getByTestId('dislike-button'));
+
+    await waitFor(() => {
+      expect(onDislike).toHaveBeenCalled();
+    });
 
     consoleSpy.mockRestore();
   });
@@ -471,17 +561,15 @@ describe('PureBubble', () => {
 
     render(
       <BubbleConfigProvide>
-        <PureBubble {...defaultProps} onLike={onLike} />
+        <PureBubble {...feedbackEnabledProps} onLike={onLike} />
       </BubbleConfigProvide>,
     );
 
-    const likeButton = screen.queryByTestId('like-button');
-    if (likeButton) {
-      fireEvent.click(likeButton);
-      await waitFor(() => {
-        expect(onLike).toHaveBeenCalled();
-      });
-    }
+    fireEvent.click(screen.getByTestId('like-button'));
+
+    await waitFor(() => {
+      expect(onLike).toHaveBeenCalled();
+    });
 
     consoleSpy.mockRestore();
   });
