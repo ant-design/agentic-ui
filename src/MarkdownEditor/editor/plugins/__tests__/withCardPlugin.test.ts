@@ -138,4 +138,124 @@ describe('withCardPlugin', () => {
     expect(editor.children.length).toBe(1);
     expect((editor.children[0] as any).type).toBe('paragraph');
   });
+
+  it('deleteBackward 在 card-after 时将光标移到内容末尾且不删除', () => {
+    const base = createEditor();
+    const origDeleteBackward = vi.fn();
+    base.deleteBackward = origDeleteBackward;
+    const editor = withCardPlugin(base);
+    editor.children = [
+      {
+        type: 'card',
+        children: [
+          { type: 'card-before', children: [{ text: '' }] },
+          { type: 'paragraph', children: [{ text: 'body' }] },
+          { type: 'card-after', children: [{ text: '' }] },
+        ],
+      },
+    ];
+    Transforms.select(editor, { path: [0, 2, 0], offset: 0 });
+    editor.deleteBackward('character');
+
+    expect(origDeleteBackward).not.toHaveBeenCalled();
+    expect(editor.selection).toEqual({
+      anchor: { path: [0, 1, 0], offset: 4 },
+      focus: { path: [0, 1, 0], offset: 4 },
+    });
+    expect((editor.children[0] as any).type).toBe('card');
+    expect((Node.get(editor, [0, 1, 0]) as any).text).toBe('body');
+  });
+
+  it('remove_node 删除 card-after 时移除整个 card 并补空段落', () => {
+    const editor = withCardPlugin(createEditor());
+    editor.children = [
+      {
+        type: 'card',
+        children: [
+          { type: 'card-before', children: [{ text: '' }] },
+          { type: 'paragraph', children: [{ text: 'body' }] },
+          { type: 'card-after', children: [{ text: '' }] },
+        ],
+      },
+    ];
+    const cardAfter = Node.get(editor, [0, 2]);
+    editor.apply({
+      type: 'remove_node',
+      path: [0, 2],
+      node: cardAfter,
+    });
+
+    expect(editor.children.length).toBe(1);
+    expect((editor.children[0] as any).type).toBe('paragraph');
+  });
+
+  it('remove_node 删除 card-before 时移除整个 card 并补空段落', () => {
+    const editor = withCardPlugin(createEditor());
+    editor.children = [
+      {
+        type: 'card',
+        children: [
+          { type: 'card-before', children: [{ text: '' }] },
+          { type: 'paragraph', children: [{ text: 'body' }] },
+          { type: 'card-after', children: [{ text: '' }] },
+        ],
+      },
+    ];
+    const cardBefore = Node.get(editor, [0, 0]);
+    editor.apply({
+      type: 'remove_node',
+      path: [0, 0],
+      node: cardBefore,
+    });
+
+    expect(editor.children.length).toBe(1);
+    expect((editor.children[0] as any).type).toBe('paragraph');
+  });
+
+  it('remove_text 清空 card 正文后 prune 空 card 并补空段落', () => {
+    const editor = withCardPlugin(createEditor());
+    editor.children = [
+      {
+        type: 'card',
+        children: [
+          { type: 'card-before', children: [{ text: '' }] },
+          { type: 'paragraph', children: [{ text: 'x' }] },
+          { type: 'card-after', children: [{ text: '' }] },
+        ],
+      },
+    ];
+    editor.apply({
+      type: 'remove_text',
+      path: [0, 1, 0],
+      offset: 0,
+      text: 'x',
+    });
+
+    expect(editor.children.length).toBe(1);
+    expect((editor.children[0] as any).type).toBe('paragraph');
+  });
+
+  it('insert_text 向空 card 正文写入后保留 card', () => {
+    const editor = withCardPlugin(createEditor());
+    editor.children = [
+      {
+        type: 'card',
+        children: [
+          { type: 'card-before', children: [{ text: '' }] },
+          { type: 'paragraph', children: [{ text: '' }] },
+          { type: 'card-after', children: [{ text: '' }] },
+        ],
+      },
+    ];
+    editor.apply({
+      type: 'insert_text',
+      path: [0, 1, 0],
+      offset: 0,
+      text: 'kept',
+    });
+
+    expect(editor.children.length).toBe(1);
+    expect((editor.children[0] as any).type).toBe('card');
+    expect((Node.get(editor, [0, 1, 0]) as any).text).toBe('kept');
+  });
 });
