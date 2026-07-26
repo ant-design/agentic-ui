@@ -1,6 +1,7 @@
 import type { FC } from 'react';
 import { describe, expect, it } from 'vitest';
 import {
+  isFileWorkspacePanel,
   isWorkspacePanelType,
   isWorkspaceSegmentedDividerKey,
   markWorkspacePanel,
@@ -55,6 +56,13 @@ describe('resolveWorkspacePanelType', () => {
   it('isWorkspacePanelType 应校验合法面板类型', () => {
     expect(isWorkspacePanelType('file')).toBe(true);
     expect(isWorkspacePanelType('unknown')).toBe(false);
+  });
+
+  it('isFileWorkspacePanel 应识别 file 与 fileTree', () => {
+    expect(isFileWorkspacePanel('file')).toBe(true);
+    expect(isFileWorkspacePanel('fileTree')).toBe(true);
+    expect(isFileWorkspacePanel('browser')).toBe(false);
+    expect(isFileWorkspacePanel(undefined)).toBe(false);
   });
 
   it('type 链存在环时不应死循环', () => {

@@ -2,6 +2,7 @@ import { act, render } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarkdownRenderer } from '../index';
+import { STREAM_TOKEN_CLASS } from '../streaming/rehypeStreamingTokens';
 import type { MarkdownRendererRef } from '../types';
 import { installRafStub } from './installRafStub';
 
@@ -354,6 +355,27 @@ describe('MarkdownRenderer', () => {
     expect(fndEl).toBeTruthy();
   });
 
+  it('流式逐词淡入时应保留带定义的脚注引用', () => {
+    const { container } = render(
+      <MarkdownRenderer
+        content={'Revenue increased[^1].\n\n[^1]: Verified source.'}
+        streaming
+        isFinished
+      />,
+    );
+
+    expect(
+      container.querySelectorAll(`.${STREAM_TOKEN_CLASS}`).length,
+    ).toBeGreaterThan(0);
+    const fncEl = container.querySelector('[data-fnc="fnc"]');
+    expect(fncEl).toBeTruthy();
+    expect(fncEl?.textContent).toContain('1');
+    expect(
+      container.querySelector('[data-be="footnoteDefinition"]'),
+    ).toBeTruthy();
+    expect(container.textContent).toContain('Verified source.');
+  });
+
   it('应渲染裸脚注引用（无定义，AI 对话场景）', () => {
     const { container } = render(
       <MarkdownRenderer
@@ -418,25 +440,50 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
-  it('应将前置段落后的多段 <think> 内容完整保留在思考组件内', () => {
-    const content =
-      '前置说明\n\n<think>\n步骤一：读取上下文\n\n步骤二：生成答案\n</think>\n\n最终回答';
-    const { container } = render(<MarkdownRenderer content={content} />);
+  it('流式 think 闭合后应将最终链接渲染在思考块外', () => {
+    const firstThink = '<think>\n分析用户请求';
+    const { container, rerender } = render(
+      <MarkdownRenderer
+        content={firstThink}
+        streaming
+        throttleOptions={{ enabled: false }}
+      />,
+    );
 
-    const thinkBlock = container.querySelector(
+    const secondThink =
+      `${firstThink}\n准备调用工具。</think>\n` +
+      '<think>\n工具调用完成';
+    rerender(
+      <MarkdownRenderer
+        content={secondThink}
+        streaming
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    const downloadUrl = 'https://example.com/result.xlsx';
+    rerender(
+      <MarkdownRenderer
+        content={`${secondThink}\n返回下载链接。</think>\n${downloadUrl}`}
+        streaming
+        isFinished
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    const thinkBlocks = container.querySelectorAll(
       '[data-testid="think-block-renderer"]',
     );
-    const thinkContent = container.querySelector(
-      '[data-testid="tool-use-bar-think-container"]',
+    const downloadLink = container.querySelector(
+      `a[href="${downloadUrl}"]`,
     );
-    const paragraphTexts = Array.from(
-      container.querySelectorAll('[data-testid="markdown-paragraph"]'),
-    ).map((paragraph) => paragraph.textContent);
 
-    expect(thinkBlock).toBeTruthy();
-    expect(thinkContent?.textContent).toContain('步骤一：读取上下文');
-    expect(thinkContent?.textContent).toContain('步骤二：生成答案');
-    expect(paragraphTexts).toEqual(['前置说明', '最终回答']);
+    expect(thinkBlocks).toHaveLength(2);
+    expect(downloadLink).toBeTruthy();
+    thinkBlocks.forEach((thinkBlock) => {
+      expect(thinkBlock).not.toContainElement(downloadLink);
+      expect(thinkBlock).not.toHaveTextContent(downloadUrl);
+    });
   });
 
   it('应将 HTML 注释 + 表格组合渲染为图表', async () => {

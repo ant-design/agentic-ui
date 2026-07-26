@@ -479,6 +479,34 @@ describe('proxySandbox/index.ts', () => {
         expect(result.results.globalIsolation).toBe(true);
         vi.restoreAllMocks();
       });
+
+      it('基本执行失败时应写入 errors 并标记 basicExecution 为 false', async () => {
+        const ProxySandboxModule = await import('../ProxySandbox');
+        vi.spyOn(ProxySandboxModule, 'runInSandbox').mockImplementation(
+          (code: string, opts?: { timeout?: number }) => {
+            if (code.includes('return 1 + 1')) {
+              return Promise.reject(new Error('boom'));
+            }
+            if (code.includes('window')) {
+              return Promise.reject(new Error('blocked'));
+            }
+            if (opts?.timeout !== undefined) {
+              return Promise.reject(new Error('Execution timeout'));
+            }
+            return Promise.resolve({ success: false, result: undefined });
+          },
+        );
+
+        const checker = SandboxHealthChecker.getInstance();
+        const result = await checker.testBasicFunctionality();
+
+        expect(result.results.basicExecution).toBe(false);
+        expect(result.errors.some((msg) => msg.includes('Basic execution failed'))).toBe(
+          true,
+        );
+
+        vi.restoreAllMocks();
+      });
     });
   });
 
