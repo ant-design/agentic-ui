@@ -277,6 +277,15 @@ describe('splitMarkdownBlocks', () => {
     expect(result[1]).toBe('<thinking>\nSecond round\n</thinking>');
   });
 
+  it('separates cross-alias think blocks while preserving blank lines', () => {
+    const md =
+      '<think>\nFirst round\n\nStill thinking\n<thinking>\nSecond round\n</thinking>';
+    expect(splitMarkdownBlocks(md)).toEqual([
+      '<think>\nFirst round\n\nStill thinking',
+      '<thinking>\nSecond round\n</thinking>',
+    ]);
+  });
+
   it('implicitly closes when second open tag is inline (e.g. <think>content)', () => {
     // 第二个开标签是行内形式
     const md = '<think>\nFirst think\n<think>Second think\n</think>';
