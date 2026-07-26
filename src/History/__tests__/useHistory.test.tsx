@@ -355,17 +355,18 @@ describe('useHistory Hook', () => {
       const consoleError = vi
         .spyOn(console, 'error')
         .mockImplementation(() => {});
+      // mount 时 useHistory 会自动 loadHistory 一次，先成功填列表，再 reject。
       const request = vi
         .fn()
         .mockResolvedValueOnce(mockHistoryData)
-        .mockRejectedValueOnce(new Error('network down'));
+        .mockRejectedValue(new Error('network down'));
 
       const { result } = renderHook(() =>
         useHistory({ ...defaultProps, request }),
       );
 
       await act(async () => {
-        await result.current.loadHistory();
+        await new Promise((r) => setTimeout(r, 0));
       });
       expect(result.current.filteredList).toEqual(mockHistoryData);
 
