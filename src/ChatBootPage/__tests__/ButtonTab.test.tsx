@@ -71,6 +71,47 @@ describe('ButtonTab 组件', () => {
     expect(handleClick).not.toHaveBeenCalled();
   });
 
+  it('应该通过 Enter/Space 触发图标 onIconClick 且不冒泡', () => {
+    const handleClick = vi.fn();
+    const handleIconClick = vi.fn();
+
+    render(
+      <ButtonTab
+        onClick={handleClick}
+        icon={<TestIcon />}
+        onIconClick={handleIconClick}
+      >
+        图标键盘
+      </ButtonTab>,
+    );
+
+    const iconButton = screen.getByTestId('test-icon').parentElement!;
+    fireEvent.keyDown(iconButton, { key: 'Enter' });
+    expect(handleIconClick).toHaveBeenCalledTimes(1);
+    expect(handleClick).not.toHaveBeenCalled();
+
+    handleIconClick.mockClear();
+    fireEvent.keyDown(iconButton, { key: ' ' });
+    expect(handleIconClick).toHaveBeenCalledTimes(1);
+    expect(handleClick).not.toHaveBeenCalled();
+  });
+
+  it('disabled 时图标键盘事件不触发 onIconClick', () => {
+    const handleIconClick = vi.fn();
+
+    render(
+      <ButtonTab disabled icon={<TestIcon />} onIconClick={handleIconClick}>
+        禁用图标
+      </ButtonTab>,
+    );
+
+    const iconElement = screen.getByTestId('test-icon').parentElement!;
+    fireEvent.keyDown(iconElement, { key: 'Enter' });
+    fireEvent.keyDown(iconElement, { key: ' ' });
+
+    expect(handleIconClick).not.toHaveBeenCalled();
+  });
+
   it('应该处理键盘事件（Enter键）', () => {
     const handleClick = vi.fn();
 

@@ -41,6 +41,20 @@ describe('htmlUrlSafety', () => {
       ).toBe(true);
     });
 
+    it('img 含 javascript: src 时应降级', () => {
+      expect(
+        shouldElementRenderAsPlainText({
+          type: 'element',
+          tagName: 'img',
+          properties: { src: 'javascript:alert(1)' },
+        }),
+      ).toBe(true);
+    });
+
+    it('非 element 节点不应降级', () => {
+      expect(shouldElementRenderAsPlainText({ type: 'text' })).toBe(false);
+    });
+
     it('div 含 onclick 时不应降级（仅剥离属性）', () => {
       expect(
         shouldElementRenderAsPlainText({
@@ -60,6 +74,33 @@ describe('htmlUrlSafety', () => {
           properties: { src: 'x', onerror: 'alert(1)' },
         }),
       ).toBe('<img src="x" onerror="alert(1)">');
+    });
+
+    it('应序列化含子元素的标签', () => {
+      expect(
+        serializeHastElement({
+          tagName: 'div',
+          properties: { class: 'wrap' },
+          children: [
+            { type: 'text', value: 'hello' },
+            {
+              type: 'element',
+              tagName: 'span',
+              properties: { id: 'x' },
+              children: [{ type: 'text', value: 'world' }],
+            },
+          ],
+        }),
+      ).toBe('<div class="wrap">hello<span id="x">world</span></div>');
+    });
+
+    it('应忽略未知子节点类型', () => {
+      expect(
+        serializeHastElement({
+          tagName: 'p',
+          children: [{ type: 'comment', value: 'ignored' }],
+        }),
+      ).toBe('<p></p>');
     });
   });
 

@@ -871,10 +871,82 @@ const splitMarkdownBlocks = (content: string): string[] => {
 
     // 在 think 上下文内，跳过空行切分，所有内容推入当前 block
     if (inThinkTag) {
-      // 检测闭标签：独占一行 或 行内包含闭标签
-      if (THINK_CLOSE_RE.test(trimmedLine) || THINK_CLOSE_INLINE_RE.test(trimmedLine)) {
-        inThinkTag = false;
+      // 场景 2：inThinkTag 内遇到新的 think 开标签 → 隐式关闭上一个块，开启新块
+      if (
+        THINK_OPEN_RE.test(trimmedLine) ||
+        THINK_OPEN_INLINE_RE.test(trimmedLine)
+      ) {
+        // 提交之前 pending 的空行
+        if (pendingBlankLines > 0) {
+          for (let i = 0; i < pendingBlankLines; i++) current.push('');
+          pendingBlankLines = 0;
+        }
+        // 先提交当前 think block（隐式关闭）
+        blocks.push(current.join('\n'));
+        current = [];
+        // 新开标签进入下一个 block，保持 inThinkTag = true
+        current.push(line);
+        continue;
       }
+
+      // 检测闭标签：独占一行 → 闭标签后紧接的正文应独立成块
+      if (THINK_CLOSE_RE.test(trimmedLine)) {
+        inThinkTag = false;
+        if (pendingBlankLines > 0) {
+          for (let i = 0; i < pendingBlankLines; i++) current.push('');
+          pendingBlankLines = 0;
+        }
+        current.push(line);
+        // 提交 think block，后续内容进入新 block
+        blocks.push(current.join('\n'));
+        current = [];
+        inList = false;
+        inBlockquote = false;
+        continue;
+      }
+
+      // 检测行内闭标签：闭标签后可能紧跟正文（场景 1）
+      if (THINK_CLOSE_INLINE_RE.test(trimmedLine)) {
+        inThinkTag = false;
+        if (pendingBlankLines > 0) {
+          for (let i = 0; i < pendingBlankLines; i++) current.push('');
+          pendingBlankLines = 0;
+        }
+        const closeMatch = trimmedLine.match(THINK_CLOSE_INLINE_RE);
+        const closeTagEnd =
+          trimmedLine.indexOf(closeMatch![0]) + closeMatch![0].length;
+        const afterClose = trimmedLine.slice(closeTagEnd).trim();
+        if (afterClose.length > 0) {
+          // 闭标签后还有内容：先提交 think block（含闭标签部分），再让剩余内容独立成块
+          // 将当前行在闭标签处拆为两部分
+          const lineBeforeClose = line.slice(
+            0,
+            line.indexOf(closeMatch![0]) + closeMatch![0].length,
+          );
+          const lineAfterClose = line.slice(
+            line.indexOf(closeMatch![0]) + closeMatch![0].length,
+          );
+          current.push(lineBeforeClose);
+          blocks.push(current.join('\n'));
+          current = [];
+          inList = false;
+          inBlockquote = false;
+          // 闭标签后的内容作为新 block 的首行
+          if (lineAfterClose.trim().length > 0) {
+            current.push(lineAfterClose.replace(/^\n/, ''));
+          }
+        } else {
+          current.push(line);
+          // 行内闭标签位于行末（闭标签后无同行内容），也需提交 think block，
+          // 避免后续下一行正文被合并到同一 block（如 "构造调用。</think>\n正文"）
+          blocks.push(current.join('\n'));
+          current = [];
+          inList = false;
+          inBlockquote = false;
+        }
+        continue;
+      }
+
       // 提交之前 pending 的空行
       if (pendingBlankLines > 0) {
         for (let i = 0; i < pendingBlankLines; i++) current.push('');

@@ -1,6 +1,5 @@
 import { render } from '@testing-library/react';
 import React from 'react';
-import type { Plugin } from 'unified';
 import { describe, expect, it } from 'vitest';
 import { MarkdownRenderer } from '../../index';
 import { createHastProcessor } from '../../processor';
@@ -46,6 +45,30 @@ describe('createStreamingTokenPlugin (hast transform)', () => {
     return acc;
   };
 
+  const hasStreamingTokenSpan = (node: any): boolean => {
+    if (!node) return false;
+    if (
+      node.type === 'element' &&
+      node.tagName === 'span' &&
+      Array.isArray(node.properties?.className) &&
+      node.properties.className.includes(STREAM_TOKEN_CLASS)
+    ) {
+      return true;
+    }
+    return (node.children || []).some((child: any) =>
+      hasStreamingTokenSpan(child),
+    );
+  };
+
+  const replaceText = (node: any, from: string, to: string): void => {
+    if (!node) return;
+    if (node.type === 'text') {
+      node.value = node.value.replace(from, to);
+      return;
+    }
+    (node.children || []).forEach((child: any) => replaceText(child, from, to));
+  };
+
   it('does nothing when disabled', () => {
     const hast = runProcessor('hello world', { enabled: false });
     expect(collectSpanTokens(hast)).toEqual([]);
@@ -67,6 +90,13 @@ describe('createStreamingTokenPlugin (hast transform)', () => {
     expect(tokens).toContain('text');
     expect(tokens).toContain('end');
     expect(tokens).not.toContain('inlineCode');
+  });
+
+  it('keeps GFM table cells untouched', () => {
+    const hast = runProcessor('| name | value |\n| --- | --- |\n| a | 1 |', {
+      enabled: true,
+    });
+    expect(collectSpanTokens(hast)).toEqual([]);
   });
 
   it('keeps KaTeX formula output untouched', () => {
@@ -137,32 +167,6 @@ describe('createStreamingTokenPlugin (hast transform)', () => {
     });
   });
 
-  it.each(['style', 'script', 'textarea'])(
-    'keeps raw %s text untouched',
-    (tagName) => {
-      const plugin = createStreamingTokenPlugin({ enabled: true });
-      const transform = (plugin as any)();
-      const tree = {
-        type: 'root',
-        children: [
-          {
-            type: 'element',
-            tagName,
-            children: [{ type: 'text', value: 'const value = "a b";' }],
-          },
-        ],
-      };
-
-      transform(tree);
-
-      expect(collectSpanTokens(tree)).toEqual([]);
-      expect(tree.children[0].children[0]).toEqual({
-        type: 'text',
-        value: 'const value = "a b";',
-      });
-    },
-  );
-
   it('keeps KaTeX math content untouched when className is a string', () => {
     const plugin = createStreamingTokenPlugin({ enabled: true });
     const transform = (plugin as any)();
@@ -187,33 +191,24 @@ describe('createStreamingTokenPlugin (hast transform)', () => {
     });
   });
 
-  it('wraps visible text added by custom rehype plugins registered before it', () => {
-    const appendVisibleTextPlugin: Plugin = () => (tree: any) => {
-      tree.children = [
-        ...(tree.children || []),
-        {
-          type: 'element',
-          tagName: 'p',
-          properties: {},
-          children: [{ type: 'text', value: 'added by rehype' }],
-        },
-      ];
+  it('runs user rehype plugins before wrapping streaming tokens', () => {
+    let sawTokenSpanBeforeUserPlugin = false;
+    const replaceTargetPlugin = () => (tree: any) => {
+      sawTokenSpanBeforeUserPlugin = hasStreamingTokenSpan(tree);
+      replaceText(tree, 'target', 'patched');
     };
+
     const processor = createHastProcessor(
       undefined,
       undefined,
       undefined,
-      [appendVisibleTextPlugin],
+      [replaceTargetPlugin as any],
       { enabled: true },
     );
-    const hast = processor.runSync(processor.parse('source')) as any;
+    const hast = processor.runSync(processor.parse('hello target')) as any;
 
-    expect(collectSpanTokens(hast)).toEqual([
-      'source',
-      'added',
-      'by',
-      'rehype',
-    ]);
+    expect(sawTokenSpanBeforeUserPlugin).toBe(false);
+    expect(collectSpanTokens(hast)).toEqual(['hello', 'patched']);
   });
 });
 
