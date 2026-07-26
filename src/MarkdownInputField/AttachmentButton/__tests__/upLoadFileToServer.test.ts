@@ -177,3 +177,237 @@ describe('upLoadFileToServer - removeFileOnUploadError', () => {
     expect(onUploadError).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('upLoadFileToServer - uploadWithResponse', () => {
+  it('should mark file done and store uploadResponse on SUCCESS', async () => {
+    const file = createFile('ok.txt', 100);
+    const fileMap = new Map<string, AttachmentFile>();
+    const onFileMapChange = vi.fn((map?: Map<string, AttachmentFile>) => {
+      if (map) {
+        fileMap.clear();
+        map.forEach((f, k) => fileMap.set(k, f));
+      }
+    });
+    const uploadResponse = {
+      fileUrl: 'https://example.com/ok.txt',
+      uploadStatus: 'SUCCESS' as const,
+      errorMessage: null,
+    };
+    const uploadWithResponse = vi.fn().mockResolvedValue(uploadResponse);
+
+    await upLoadFileToServer([file], {
+      uploadWithResponse,
+      fileMap,
+      onFileMapChange,
+    });
+
+    const stored = Array.from(fileMap.values())[0];
+    expect(uploadWithResponse).toHaveBeenCalledTimes(1);
+    expect(stored.status).toBe('done');
+    expect(stored.url).toBe('https://example.com/ok.txt');
+    expect(stored.uploadResponse).toEqual(uploadResponse);
+  });
+
+  it('should surface response errorMessage when uploadStatus is not SUCCESS', async () => {
+    const onUploadError = vi.fn();
+    const file = createFile('fail.txt', 100);
+    const fileMap = new Map<string, AttachmentFile>();
+    const onFileMapChange = vi.fn((map?: Map<string, AttachmentFile>) => {
+      if (map) {
+        fileMap.clear();
+        map.forEach((f, k) => fileMap.set(k, f));
+      }
+    });
+    const uploadWithResponse = vi.fn().mockResolvedValue({
+      fileUrl: '',
+      uploadStatus: 'FAILED',
+      errorMessage: 'virus detected',
+    });
+
+    await upLoadFileToServer([file], {
+      uploadWithResponse,
+      fileMap,
+      onFileMapChange,
+      onUploadError,
+    });
+
+    const stored = Array.from(fileMap.values())[0];
+    expect(stored.status).toBe('error');
+    expect(stored.errorMessage).toBe('virus detected');
+    expect(onUploadError).toHaveBeenCalledTimes(1);
+    expect(onUploadError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: 'virus detected',
+        file: expect.objectContaining({ name: 'fail.txt' }),
+      }),
+    );
+  });
+
+  it('should remove file when uploadWithResponse fails and removeFileOnUploadError is true', async () => {
+    const file = createFile('remove-me.txt', 100);
+    const fileMap = new Map<string, AttachmentFile>();
+    const latestMap = { current: fileMap };
+    const onFileMapChange = vi.fn((map?: Map<string, AttachmentFile>) => {
+      latestMap.current = new Map(map);
+    });
+    const uploadWithResponse = vi.fn().mockResolvedValue({
+      fileUrl: '',
+      uploadStatus: 'FAILED',
+      errorMessage: 'rejected',
+    });
+
+    await upLoadFileToServer([file], {
+      uploadWithResponse,
+      fileMap,
+      onFileMapChange,
+      removeFileOnUploadError: true,
+    });
+
+    expect(latestMap.current.size).toBe(0);
+  });
+
+  it('should prefer uploadWithResponse over upload', async () => {
+    const file = createFile('prefer.txt', 100);
+    const upload = vi.fn().mockResolvedValue('https://example.com/ignored');
+    const uploadWithResponse = vi.fn().mockResolvedValue({
+      fileUrl: 'https://example.com/prefer.txt',
+      uploadStatus: 'SUCCESS',
+      errorMessage: null,
+    });
+
+    await upLoadFileToServer([file], { upload, uploadWithResponse });
+
+    expect(uploadWithResponse).toHaveBeenCalledTimes(1);
+    expect(upload).not.toHaveBeenCalled();
+  });
+});
+
+describe('upLoadFileToServer - Map identity and count guards', () => {
+  it('should notify onFileMapChange with a new Map reference each time', async () => {
+    const file = createFile('map.txt', 100);
+    const fileMap = new Map<string, AttachmentFile>();
+    const seenMaps: Array<Map<string, AttachmentFile> | undefined> = [];
+    const onFileMapChange = vi.fn((map?: Map<string, AttachmentFile>) => {
+      seenMaps.push(map);
+    });
+    const upload = vi.fn().mockResolvedValue('https://example.com/map.txt');
+
+    await upLoadFileToServer([file], {
+      upload,
+      fileMap,
+      onFileMapChange,
+    });
+
+    expect(seenMaps.length).toBeGreaterThan(0);
+    for (const map of seenMaps) {
+      expect(map).toBeInstanceOf(Map);
+      expect(map).not.toBe(fileMap);
+    }
+  });
+
+  it('should abort without mutating fileMap when minFileCount is not met', async () => {
+    const upload = vi.fn().mockResolvedValue('https://example.com/x.txt');
+    const file = createFile('only-one.txt', 100);
+    const fileMap = new Map<string, AttachmentFile>();
+    const onFileMapChange = vi.fn();
+
+    await upLoadFileToServer([file], {
+      upload,
+      fileMap,
+      onFileMapChange,
+      minFileCount: 2,
+    });
+
+    expect(upload).not.toHaveBeenCalled();
+    expect(fileMap.size).toBe(0);
+    expect(onFileMapChange).not.toHaveBeenCalled();
+  });
+
+  it('should interpolate ${maxFileCount} in locale message when count is exceeded', async () => {
+    const file = createFile('extra.txt', 100);
+    const fileMap = new Map<string, AttachmentFile>();
+    const onFileMapChange = vi.fn((map?: Map<string, AttachmentFile>) => {
+      if (map) {
+        fileMap.clear();
+        map.forEach((f, k) => fileMap.set(k, f));
+      }
+    });
+    const onExceedMaxCount = vi.fn();
+
+    await upLoadFileToServer([file], {
+      fileMap,
+      onFileMapChange,
+      maxFileCount: 0,
+      onExceedMaxCount,
+      locale: {
+        'markdownInput.maxFileCountExceeded':
+          'limit is ${maxFileCount} files',
+      } as any,
+    });
+
+    const stored = Array.from(fileMap.values())[0];
+    expect(stored.status).toBe('error');
+    expect(stored.errorCode).toBe('FILE_COUNT_EXCEEDED');
+    expect(stored.errorMessage).toBe('limit is 0 files');
+    expect(onExceedMaxCount).toHaveBeenCalledWith({
+      maxCount: 0,
+      currentCount: 0,
+      selectedCount: 1,
+    });
+  });
+
+  it('should interpolate ${maxSize} in locale message when file is oversized', async () => {
+    const maxFileSize = 2048;
+    const file = createFile('big.txt', maxFileSize + 1);
+    const fileMap = new Map<string, AttachmentFile>();
+    const onFileMapChange = vi.fn((map?: Map<string, AttachmentFile>) => {
+      if (map) {
+        fileMap.clear();
+        map.forEach((f, k) => fileMap.set(k, f));
+      }
+    });
+
+    await upLoadFileToServer([file], {
+      maxFileSize,
+      fileMap,
+      onFileMapChange,
+      locale: {
+        'markdownInput.fileSizeExceeded': 'too large: ${maxSize} KB',
+      } as any,
+    });
+
+    const stored = Array.from(fileMap.values())[0];
+    expect(stored.errorCode).toBe('FILE_SIZE_EXCEEDED');
+    expect(stored.errorMessage).toBe('too large: 2 KB');
+  });
+
+  it('should use locale uploadFailed when upload rejects a non-Error value', async () => {
+    const onUploadError = vi.fn();
+    const file = createFile('fail.txt', 100);
+    const fileMap = new Map<string, AttachmentFile>();
+    const onFileMapChange = vi.fn((map?: Map<string, AttachmentFile>) => {
+      if (map) {
+        fileMap.clear();
+        map.forEach((f, k) => fileMap.set(k, f));
+      }
+    });
+    const upload = vi.fn().mockRejectedValue('network down');
+
+    await upLoadFileToServer([file], {
+      upload,
+      fileMap,
+      onFileMapChange,
+      onUploadError,
+      locale: {
+        uploadFailed: 'custom upload failed',
+      } as any,
+    });
+
+    const stored = Array.from(fileMap.values())[0];
+    expect(stored.status).toBe('error');
+    expect(stored.errorMessage).toBe('custom upload failed');
+    expect(onUploadError).toHaveBeenCalledWith(
+      expect.objectContaining({ error: 'network down' }),
+    );
+  });
+});
