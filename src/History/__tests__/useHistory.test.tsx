@@ -335,6 +335,74 @@ describe('useHistory Hook', () => {
       expect(result.current.filteredList).toEqual([]);
     });
 
+    it('request 缺失时 loadHistory 应提前返回且不抛错', async () => {
+      const { result } = renderHook(() =>
+        useHistory({
+          ...defaultProps,
+          request: undefined as unknown as typeof defaultProps.request,
+        }),
+      );
+
+      await expect(
+        act(async () => {
+          await result.current.loadHistory();
+        }),
+      ).resolves.toBeUndefined();
+      expect(result.current.filteredList).toEqual([]);
+    });
+
+    it('request reject 时应清空列表并打出错误日志', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const request = vi
+        .fn()
+        .mockResolvedValueOnce(mockHistoryData)
+        .mockRejectedValueOnce(new Error('network down'));
+
+      const { result } = renderHook(() =>
+        useHistory({ ...defaultProps, request }),
+      );
+
+      await act(async () => {
+        await result.current.loadHistory();
+      });
+      expect(result.current.filteredList).toEqual(mockHistoryData);
+
+      await act(async () => {
+        await result.current.loadHistory();
+      });
+
+      expect(result.current.filteredList).toEqual([]);
+      expect(consoleError).toHaveBeenCalledWith(
+        '[History] loadHistory failed:',
+        expect.any(Error),
+      );
+      consoleError.mockRestore();
+    });
+
+    it('request reject 且列表已空时应保持引用稳定', async () => {
+      const consoleError = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      const request = vi.fn().mockRejectedValue(new Error('fail'));
+      const { result } = renderHook(() =>
+        useHistory({ ...defaultProps, request }),
+      );
+
+      await act(async () => {
+        await result.current.loadHistory();
+      });
+      const emptyRef = result.current.filteredList;
+      expect(emptyRef).toEqual([]);
+
+      await act(async () => {
+        await result.current.loadHistory();
+      });
+      expect(result.current.filteredList).toBe(emptyRef);
+      consoleError.mockRestore();
+    });
+
     it('actionRef 注入 reload', async () => {
       const actionRef = { current: null as { reload: () => void } | null };
       renderHook(() => useHistory({ ...defaultProps, actionRef }));
