@@ -90,6 +90,59 @@ describe('codeBlockBehavior', () => {
     );
   });
 
+  it('handleCodeBlockAceKeyDown Mod+Enter 在代码块后插入段落', () => {
+    const editor = createEditor();
+    editor.children = [
+      {
+        type: 'code',
+        value: 'console.log(1)',
+        language: 'js',
+        children: [{ text: '' }],
+      },
+    ];
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      metaKey: true,
+    });
+    const preventSpy = vi.spyOn(event, 'preventDefault');
+    const stopSpy = vi.spyOn(event, 'stopPropagation');
+
+    expect(
+      handleCodeBlockAceKeyDown(editor, [0], event, 'console.log(1)'),
+    ).toBe('handled');
+    expect(preventSpy).toHaveBeenCalled();
+    expect(stopSpy).toHaveBeenCalled();
+    expect(editor.children).toHaveLength(2);
+    expect(editor.children[0]).toEqual(
+      expect.objectContaining({
+        type: 'code',
+        value: 'console.log(1)',
+      }),
+    );
+    expect(editor.children[1]).toEqual(
+      expect.objectContaining({ type: 'paragraph' }),
+    );
+  });
+
+  it('handleCodeBlockAceKeyDown Shift+Mod+Enter 不拦截', () => {
+    const editor = createEditor();
+    editor.children = [
+      {
+        type: 'code',
+        value: 'x',
+        children: [{ text: '' }],
+      },
+    ];
+    const event = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      ctrlKey: true,
+      shiftKey: true,
+    });
+
+    expect(handleCodeBlockAceKeyDown(editor, [0], event, 'x')).toBe('ignored');
+    expect(editor.children).toHaveLength(1);
+  });
+
   it('isCodeBlockAceInputTarget 识别 textarea', () => {
     const root = document.createElement('div');
     root.setAttribute('data-be', 'code');

@@ -132,6 +132,49 @@ describe('adaptiveTooltip', () => {
     expect(window.removeEventListener).toHaveBeenCalled();
   });
 
+  it('多订阅者共享一对 window 监听，最后取消订阅才拆除', () => {
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+
+    vi.stubGlobal('window', {
+      innerWidth: 1920,
+      addEventListener,
+      removeEventListener,
+    });
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+      maxTouchPoints: 0,
+    });
+
+    const first = subscribeAdaptiveTooltipEnvironment(vi.fn());
+    expect(addEventListener).toHaveBeenCalledTimes(2);
+    expect(addEventListener).toHaveBeenCalledWith(
+      'resize',
+      expect.any(Function),
+    );
+    expect(addEventListener).toHaveBeenCalledWith(
+      'orientationchange',
+      expect.any(Function),
+    );
+
+    const second = subscribeAdaptiveTooltipEnvironment(vi.fn());
+    expect(addEventListener).toHaveBeenCalledTimes(2);
+
+    first();
+    expect(removeEventListener).not.toHaveBeenCalled();
+
+    second();
+    expect(removeEventListener).toHaveBeenCalledTimes(2);
+    expect(removeEventListener).toHaveBeenCalledWith(
+      'resize',
+      expect.any(Function),
+    );
+    expect(removeEventListener).toHaveBeenCalledWith(
+      'orientationchange',
+      expect.any(Function),
+    );
+  });
+
   it('window 未定义时 subscribe 返回空清理函数', () => {
     vi.stubGlobal('window', undefined);
     const cleanup = subscribeAdaptiveTooltipEnvironment(vi.fn());

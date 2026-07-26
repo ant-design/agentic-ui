@@ -3,6 +3,7 @@ import {
   markdownToHtml,
   markdownToHtmlSync,
 } from '../../MarkdownEditor/editor/utils/markdownToHtml';
+import { rehypeSanitizeUserHtml } from '../rehypeSanitizeUserHtml';
 
 describe('rehypeSanitizeUserHtml', () => {
   describe('危险元素过滤', () => {
@@ -157,6 +158,69 @@ describe('rehypeSanitizeUserHtml', () => {
         '<img src="https://example.com/img.png" alt="test">',
       );
       expect(result).toContain('src="https://example.com/img.png"');
+    });
+  });
+
+  describe('媒体与属性边界', () => {
+    it('应将含事件处理器的 iframe 降级为纯文本', async () => {
+      const result = await markdownToHtml(
+        '<iframe src="https://example.com" onload="alert(1)"></iframe>\n\nSafe',
+      );
+      expect(result).toContain('Safe');
+      expect(result).not.toMatch(/<iframe[\s>]/i);
+      expect(result).toMatch(/&#x3C;iframe|&lt;iframe/i);
+      expect(result).toMatch(/onload|onLoad/i);
+    });
+
+    it('应将 javascript: iframe src 降级为纯文本', async () => {
+      const result = await markdownToHtml(
+        '<iframe src="javascript:alert(1)"></iframe>',
+      );
+      expect(result).not.toMatch(/<iframe[\s>]/i);
+      expect(result).toContain('javascript:');
+      expect(result).toMatch(/&#x3C;iframe|&lt;iframe/i);
+    });
+
+    it('应将含危险 srcset 的 img 降级为纯文本', async () => {
+      const result = await markdownToHtml(
+        '<img src="https://example.com/a.png" srcset="javascript:alert(1) 1x" alt="x">',
+      );
+      // srcset 值以 javascript: 开头时，整节点走纯文本降级，避免残留可执行属性
+      expect(result).not.toMatch(/<img[\s>]/i);
+      expect(result).toMatch(/&#x3C;img|&lt;img/i);
+      expect(result).toContain('javascript:');
+    });
+
+    it('应将含 onload 的 svg 降级为纯文本', async () => {
+      const result = await markdownToHtml(
+        '<svg onload="alert(1)"><circle r="1"></circle></svg>\n\nSafe',
+      );
+      expect(result).toContain('Safe');
+      expect(result).not.toMatch(/<svg[\s>]/i);
+      expect(result).toMatch(/&#x3C;svg|&lt;svg/i);
+    });
+
+    it('直接处理 HAST 时移除 camelCase 事件属性', () => {
+      const tree = {
+        type: 'root',
+        children: [
+          {
+            type: 'element',
+            tagName: 'div',
+            properties: {
+              onClick: 'alert(1)',
+              className: ['ok'],
+            },
+            children: [{ type: 'text', value: 'Safe' }],
+          },
+        ],
+      };
+
+      rehypeSanitizeUserHtml()(tree);
+
+      expect(tree.children[0].properties.onClick).toBeUndefined();
+      expect(tree.children[0].properties.className).toEqual(['ok']);
+      expect(tree.children[0].children[0].value).toBe('Safe');
     });
   });
 

@@ -573,6 +573,26 @@ describe('SchemaEditor', () => {
   });
 
   describe('Schema验证', () => {
+    const validEditableSchema: LowCodeSchema = {
+      version: '1.0.0',
+      name: 'Test Schema',
+      description: 'Valid schema for editor validation wiring',
+      component: {
+        type: 'html',
+        schema: '<div>Hello {{name}}</div>',
+        properties: {
+          name: {
+            type: 'string',
+            title: '名称',
+            default: 'World',
+          },
+        },
+      },
+      initialValues: {
+        name: 'World',
+      },
+    };
+
     it('应该显示验证错误', async () => {
       const invalidSchema: LowCodeSchema = {
         version: '1.0.0',
@@ -598,6 +618,101 @@ describe('SchemaEditor', () => {
         // 验证组件已运行
         expect(screen.getByTestId('schema-renderer')).toBeInTheDocument();
       });
+    });
+
+    it('JSON 编辑为非法 version 时，预览区展示真实 Ajv 错误', async () => {
+      render(
+        <TestWrapper>
+          <SchemaEditor initialSchema={validEditableSchema} />
+        </TestWrapper>,
+      );
+
+      const jsonEditor = screen.getByTestId('ace-textarea-json');
+      const invalidSchema = {
+        ...validEditableSchema,
+        version: 'not-a-semver',
+      };
+
+      fireEvent.change(jsonEditor, {
+        target: { value: JSON.stringify(invalidSchema) },
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/⚠️.*must match pattern/i),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('JSON 编辑为非法 component.type 时，预览区展示枚举错误', async () => {
+      render(
+        <TestWrapper>
+          <SchemaEditor initialSchema={validEditableSchema} />
+        </TestWrapper>,
+      );
+
+      const jsonEditor = screen.getByTestId('ace-textarea-json');
+      const invalidSchema = {
+        ...validEditableSchema,
+        component: {
+          ...validEditableSchema.component,
+          type: 'nope',
+        },
+      };
+
+      fireEvent.change(jsonEditor, {
+        target: { value: JSON.stringify(invalidSchema) },
+      });
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/⚠️.*must be equal to one of the allowed values/i),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('修正为合法 Schema 后清除验证错误并触发 onChange', async () => {
+      const handleChange = vi.fn();
+
+      render(
+        <TestWrapper>
+          <SchemaEditor
+            initialSchema={validEditableSchema}
+            onChange={handleChange}
+          />
+        </TestWrapper>,
+      );
+
+      const jsonEditor = screen.getByTestId('ace-textarea-json');
+      fireEvent.change(jsonEditor, {
+        target: {
+          value: JSON.stringify({
+            ...validEditableSchema,
+            version: 'bad',
+          }),
+        },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/⚠️/)).toBeInTheDocument();
+      });
+
+      handleChange.mockClear();
+      const fixedSchema = {
+        ...validEditableSchema,
+        name: 'Fixed Schema',
+      };
+      fireEvent.change(jsonEditor, {
+        target: { value: JSON.stringify(fixedSchema) },
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText(/⚠️/)).not.toBeInTheDocument();
+      });
+      expect(handleChange).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Fixed Schema' }),
+        expect.any(Object),
+      );
     });
   });
 

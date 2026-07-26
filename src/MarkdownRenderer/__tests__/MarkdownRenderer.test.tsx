@@ -440,6 +440,26 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('最终回答');
   });
 
+  it('不应将 </think> 后同帧到达的正文渲染进深度思考组件', () => {
+    const downloadUrl = 'http://example.com/result.xlsx';
+    const { container } = render(
+      <MarkdownRenderer
+        content={`<think>\n构造调用。\n</think>${downloadUrl}`}
+      />,
+    );
+
+    const thinkBlock = container.querySelector(
+      '[data-testid="think-block-renderer"]',
+    );
+    const downloadLink = container.querySelector(`a[href="${downloadUrl}"]`);
+
+    expect(thinkBlock).toBeTruthy();
+    expect(thinkBlock).toHaveTextContent('构造调用。');
+    expect(downloadLink).toBeTruthy();
+    expect(thinkBlock).not.toContainElement(downloadLink);
+    expect(thinkBlock).not.toHaveTextContent(downloadUrl);
+  });
+
   it('流式 think 闭合后应将最终链接渲染在思考块外', () => {
     const firstThink = '<think>\n分析用户请求';
     const { container, rerender } = render(
@@ -451,8 +471,7 @@ describe('MarkdownRenderer', () => {
     );
 
     const secondThink =
-      `${firstThink}\n准备调用工具。</think>\n` +
-      '<think>\n工具调用完成';
+      `${firstThink}\n准备调用工具。</think>\n` + '<think>\n工具调用完成';
     rerender(
       <MarkdownRenderer
         content={secondThink}
@@ -474,15 +493,47 @@ describe('MarkdownRenderer', () => {
     const thinkBlocks = container.querySelectorAll(
       '[data-testid="think-block-renderer"]',
     );
-    const downloadLink = container.querySelector(
-      `a[href="${downloadUrl}"]`,
-    );
+    const downloadLink = container.querySelector(`a[href="${downloadUrl}"]`);
 
     expect(thinkBlocks).toHaveLength(2);
     expect(downloadLink).toBeTruthy();
     thinkBlocks.forEach((thinkBlock) => {
       expect(thinkBlock).not.toContainElement(downloadLink);
       expect(thinkBlock).not.toHaveTextContent(downloadUrl);
+    });
+  });
+
+  it('流式遇到新的 think 开标签时应独立渲染前一个思考块', () => {
+    const firstThink = '<think>\n第一轮思考';
+    const { container, rerender } = render(
+      <MarkdownRenderer
+        content={firstThink}
+        streaming
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    rerender(
+      <MarkdownRenderer
+        content={`${firstThink}\n<think>\n第二轮思考\n</think>\n\n最终回答`}
+        streaming
+        isFinished
+        throttleOptions={{ enabled: false }}
+      />,
+    );
+
+    const thinkBlocks = container.querySelectorAll(
+      '[data-testid="think-block-renderer"]',
+    );
+
+    expect(thinkBlocks).toHaveLength(2);
+    expect(thinkBlocks[0]).toHaveTextContent('第一轮思考');
+    expect(thinkBlocks[0]).not.toHaveTextContent('第二轮思考');
+    expect(thinkBlocks[1]).toHaveTextContent('第二轮思考');
+    expect(thinkBlocks[1]).not.toHaveTextContent('第一轮思考');
+    expect(container).toHaveTextContent('最终回答');
+    thinkBlocks.forEach((thinkBlock) => {
+      expect(thinkBlock).not.toHaveTextContent('最终回答');
     });
   });
 

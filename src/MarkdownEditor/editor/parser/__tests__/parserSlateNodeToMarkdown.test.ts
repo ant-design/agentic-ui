@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parserSlateNodeToMarkdown } from '../parserSlateNodeToMarkdown';
 
 describe('parserSlateNodeToMarkdown', () => {
@@ -141,6 +141,27 @@ describe('parserSlateNodeToMarkdown', () => {
       ];
       const result = parserSlateNodeToMarkdown(nodes);
       expect(result).toBe('```markdown\n任务内容\n```');
+    });
+
+    it('should serialize circular code values as an empty fenced block', () => {
+      const circularValue: Record<string, unknown> = {};
+      circularValue.self = circularValue;
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const result = parserSlateNodeToMarkdown([
+        {
+          type: 'code',
+          language: 'json',
+          value: circularValue,
+        },
+      ]);
+
+      expect(result).toBe('```json\n```');
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Invalid code object',
+        expect.any(TypeError),
+      );
+      warnSpy.mockRestore();
     });
 
     it('void 代码块位于多段提示词中时应保持块顺序与占位符', () => {
