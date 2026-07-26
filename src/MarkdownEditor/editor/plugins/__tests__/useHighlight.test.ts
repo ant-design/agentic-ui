@@ -141,6 +141,48 @@ describe('useHighlight', () => {
       expect(ranges2.length).toBeGreaterThan(0);
     });
 
+    it('path 变化时应使缓存失效并按新 path 重算装饰范围', () => {
+      const high = useHighlight(store);
+      const node = {
+        type: 'paragraph',
+        children: [{ text: 'see https://example.com here' }],
+      } as any;
+
+      high([node, [0]]);
+      expect(cacheTextNode.get(node)?.path).toEqual([0]);
+
+      const rangesAtNewPath = high([node, [1]]);
+      const cachedEntry = cacheTextNode.get(node);
+      expect(cachedEntry?.path).toEqual([1]);
+
+      const linkRange = rangesAtNewPath.find((r: any) => r.link);
+      expect(linkRange).toBeDefined();
+      expect(linkRange.anchor.path).toEqual([1, 0]);
+      expect(linkRange.focus.path).toEqual([1, 0]);
+    });
+
+    it('不完整 Jinja 片段不应产生 jinja 装饰范围', () => {
+      const high = useHighlight(store, true);
+
+      for (const text of ['{{}}', '{{', '{%%}']) {
+        const node = {
+          type: 'paragraph',
+          children: [{ text }],
+        } as any;
+        const ranges = high([node, [0]]);
+        const jinjaRanges = ranges.filter(
+          (r: any) =>
+            r.jinjaDelimiter ||
+            r.jinjaVariableName ||
+            r.jinjaKeyword ||
+            r.jinjaComment ||
+            r.jinjaFilter ||
+            r.jinjaPlaceholder,
+        );
+        expect(jinjaRanges).toHaveLength(0);
+      }
+    });
+
     it('handles table-cell type in PARAGRAPH_TYPES', () => {
       const high = useHighlight(store);
       const node = {

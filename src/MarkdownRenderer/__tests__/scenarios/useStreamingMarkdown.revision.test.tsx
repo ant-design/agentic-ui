@@ -81,4 +81,33 @@ describe('useMarkdownToReact contentRevisionSource', () => {
     unmount();
     expect(counters.unmounts).toBe(1);
   });
+
+  it('非前缀修订源替换时重新挂载已缓存的代码块', () => {
+    const counters: Counters = { mounts: 0, unmounts: 0 };
+    const CodeBlockProbe = createCodeBlockProbe(counters);
+    const chartBlock =
+      '```chart\n{"config":[{"chartType":"line"}],"dataSource":[]}\n```';
+
+    const { rerender } = render(
+      <RevisionHarness
+        content={chartBlock}
+        streaming
+        codeBlockComponent={CodeBlockProbe}
+        contentRevisionSource="first answer"
+      />,
+    );
+
+    expect(counters).toEqual({ mounts: 1, unmounts: 0 });
+
+    rerender(
+      <RevisionHarness
+        content={chartBlock}
+        streaming
+        codeBlockComponent={CodeBlockProbe}
+        contentRevisionSource="regenerated answer"
+      />,
+    );
+
+    expect(counters).toEqual({ mounts: 2, unmounts: 1 });
+  });
 });

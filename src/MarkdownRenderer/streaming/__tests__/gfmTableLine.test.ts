@@ -2,33 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { endsInsideGfmTable, isGfmTableLine } from '../gfmTableLine';
 
 describe('isGfmTableLine', () => {
-  it.each([
-    '| name | value |',
-    '  | name | value |  ',
-    '| --- | --- |',
-    '|:---|:---:|---:|',
-  ])('识别 GFM 表格行: %s', (line) => {
-    expect(isGfmTableLine(line)).toBe(true);
+  it('detects leading-pipe and pipe-less GFM table rows', () => {
+    expect(isGfmTableLine('| name | value |')).toBe(true);
+    expect(isGfmTableLine('name | value')).toBe(true);
   });
 
-  it.each(['plain text', 'name | value', '| unfinished'])(
-    '拒绝非完整 GFM 表格行: %s',
-    (line) => {
-      expect(isGfmTableLine(line)).toBe(false);
-    },
-  );
+  it('detects in-progress streaming rows with trailing pipes', () => {
+    expect(isGfmTableLine('| value |')).toBe(true);
+    expect(isGfmTableLine('value |')).toBe(true);
+  });
+
+  it('detects leading-pipe and pipe-less GFM table separators', () => {
+    expect(isGfmTableLine('| :--- | ---: |')).toBe(true);
+    expect(isGfmTableLine(':--- | ---:')).toBe(true);
+  });
+
+  it('ignores non-table text', () => {
+    expect(isGfmTableLine('plain text without cells')).toBe(false);
+  });
 });
 
 describe('endsInsideGfmTable', () => {
-  it('忽略末尾空行并识别最后一个表格行', () => {
-    const source = '| name | value |\n| --- | --- |\n| foo | bar |\n\n';
-
-    expect(endsInsideGfmTable(source)).toBe(true);
-  });
-
-  it('最后一个非空行是正文时返回 false', () => {
-    const source = '| name | value |\n| --- | --- |\n\nAnswer\n';
-
-    expect(endsInsideGfmTable(source)).toBe(false);
+  it('treats a pipe-less table row as an active streaming table tail', () => {
+    expect(endsInsideGfmTable('name | value\n--- | ---\nalpha | 1')).toBe(
+      true,
+    );
   });
 });

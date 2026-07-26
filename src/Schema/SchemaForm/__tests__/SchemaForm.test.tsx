@@ -323,6 +323,22 @@ describe('SchemaForm', () => {
     expect(numberInput).toHaveAttribute('aria-valuemax', '100');
   });
 
+  it('validates required fields inside object-array rows', async () => {
+    const user = userEvent.setup();
+    render(<SchemaForm schema={mockSchema} />);
+
+    await user.click(screen.getByText('添加 项目列表'));
+
+    const nameInput = await screen.findByLabelText('名称');
+    await user.type(nameInput, '临时');
+    await user.clear(nameInput);
+    await user.tab();
+
+    await waitFor(() => {
+      expect(screen.getByText('请输入 名称')).toBeInTheDocument();
+    });
+  });
+
   it('handles select dropdown', async () => {
     const user = userEvent.setup();
     render(<SchemaForm schema={mockSchema} />);
