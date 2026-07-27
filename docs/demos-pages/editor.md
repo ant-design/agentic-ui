@@ -63,9 +63,11 @@ group:
 
 <code src="../demos/rerender.tsx" background="var(--main-bg-color)" iframe=540></code>
 
-### Bubble 内动态 render（流式 Markdown）
+### Bubble 内动态 render（流式 Markdown · 逐词淡入）
 
 <code src="../demos/bubble/rerender-bubble-demo.tsx" background="var(--main-bg-color)" iframe=720></code>
+
+> 使用 `markdownRenderConfig.renderMode: 'markdown'` 时默认开启 GPT 风格逐词淡入；关闭见 `throttleOptions.fade`（[MarkdownRenderer](../components/markdown-renderer#streaming-fade)）。
 
 ### 编辑模式-动态render
 

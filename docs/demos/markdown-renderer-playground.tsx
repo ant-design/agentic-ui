@@ -33,7 +33,7 @@ function greet(name: string) {
 }
 \`\`\`
 
-> 引用段落 · 用于验证流式末段淡入是否随段落出现。
+> 提示：流式过程中内容随 SSE 即时更新渲染 · 用于验证限流与逐词淡入是否随段落出现。
 
 | 名称 | 含义 |
 | --- | --- |
@@ -60,6 +60,7 @@ export default () => {
   const fullContent = PRESET_CONTENT[preset];
 
   const [streaming, setStreaming] = useState(true);
+  const [fade, setFade] = useState(true);
 
   const [openInNewTab, setOpenInNewTab] = useState(true);
   const [interceptLink, setInterceptLink] = useState(false);
@@ -149,7 +150,7 @@ export default () => {
       </Typography.Title>
       <Typography.Paragraph type="secondary" style={{ margin: 0 }}>
         通过下面的控制面板可以串联调试 MarkdownRenderer 的核心
-        API：流式控制、字符队列、链接行为、自定义渲染、命令式 ref。
+        API：流式控制、限流与逐词淡入、链接行为、自定义渲染、命令式 ref。
       </Typography.Paragraph>
 
       <div style={SECTION_STYLE}>
@@ -178,12 +179,16 @@ export default () => {
       </div>
 
       <div style={SECTION_STYLE}>
-        <Typography.Text strong>2. 流式开关</Typography.Text>
+        <Typography.Text strong>2. 流式与逐词淡入</Typography.Text>
         <Divider style={{ margin: '8px 0' }} />
         <Space size="large" wrap>
           <Space>
             <span>streaming</span>
             <Switch checked={streaming} onChange={setStreaming} />
+          </Space>
+          <Space>
+            <span>throttleOptions.fade</span>
+            <Switch checked={fade} onChange={setFade} />
           </Space>
         </Space>
       </div>
@@ -228,6 +233,7 @@ export default () => {
           ref={rendererRef}
           content={content}
           streaming={streaming}
+          throttleOptions={{ fade }}
           linkConfig={linkConfig}
           eleRender={eleRender}
         />
