@@ -440,9 +440,11 @@ OpenClaw 会话 / transcript 常见字段：`timestamp`（毫秒）、工具结�
 
 <code src="../demos/bubble/ollama-messages-bubblelist.tsx">Ollama messages - useOllamaMessageBubbleData</code>
 
-### 流式 Markdown：`throttleOptions.fade`
+### 流式 Markdown：`throttleOptions.fade` {#streaming-fade}
 
-在 `markdownRenderConfig.renderMode` / `renderType` 为 `markdown` 且消息处于流式输出时，新出现的词语会以 GPT 风格逐词淡入。**未传该字段时默认开启**。若需关闭逐词淡入，请显式传入 `throttleOptions={{ fade: false }}`：
+当 `markdownRenderConfig.renderMode`（或 `renderType`）为 `'markdown'` 且消息处于流式输出时，默认对新出现的词语做 GPT 风格逐词淡入（未传 `fade` 时开启）。完整说明见 [MarkdownRenderer · 流式与逐词淡入](./markdown-renderer#streaming-fade)。
+
+关闭淡入：
 
 ```tsx | pure
 import { BubbleList } from '@ant-design/agentic-ui';
@@ -456,7 +458,7 @@ import { BubbleList } from '@ant-design/agentic-ui';
 />;
 ```
 
-<code src="../demos/bubble/rerender-bubble-demo.tsx"></code> 演示中亦包含该配置说明。
+<code src="../demos/bubble/rerender-bubble-demo.tsx">Bubble 内流式 Markdown（含 fade 说明）</code>
 
 ## 📖 API 参考
 

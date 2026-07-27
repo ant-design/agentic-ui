@@ -28,6 +28,12 @@
 - 在末块内对 `renderMarkdownBlock` 做增量阈值（`LAST_BLOCK_THROTTLE_CHARS = 20`），减少极小增量的重复 parse；跳过时用 ref 保留上一棵子树（仅末块路径）。
 - 触发立即 parse 的字符集：`BLOCK_BOUNDARY_TRIGGERS = /[\n\`|#>\*\-!~]/`、`INLINE*CONTEXT_TRIGGERS = /(?:^|\s)[$[<*]/`。inline trigger 的目的是让 `<a`/`\_em`/`[link`/`$math` 等出现时立即进入 token 缓存的 incomplete 判定，避免短增量被节流卡住。
 
+## 逐词淡入（展示层）
+
+- 与块缓存正交：`rehypeStreamingTokens` 在最终 hast 上把可见文本拆成 `.stream-token` span；CSS `agenticMdBlurFadeIn` 仅对新节点播放。
+- 开关：`throttleOptions.fade`（默认开启，仅 `streaming`）；代码块 / 表格 / KaTeX 跳过拆词。
+- processor 实例在流式会话内保持稳定，避免 chart / 代码块因 plugin 引用变化而卸载重挂。
+
 ## 性能上限
 
 - `useStreaming` 的 pending 缓冲区由各 recognizer 的正则上限决定：link/image/html 限 1000 字符、emphasis 限 1000、inline-code 限 300。pending 超过上限时正则不再匹配，自然走 `commitCache` 路径——所以"不完整 token 暂缓"对超长行有自我兜底。

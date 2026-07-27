@@ -230,35 +230,35 @@ export default () => {
 
 #### 内容与模式
 
-| 属性            | 说明                                                                                                                                                     | 类型                     | 默认值    | 版本 |
-| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------- | ---- |
-| initValue       | 初始 Markdown 文本内容                                                                                                                                   | `string`                 | -         | -    |
-| initSchemaValue | 直接传入 Slate schema，优先级高于 `initValue`                                                                                                            | `Elements[]`             | -         | -    |
-| readonly        | 是否只读模式。与 `renderMode` 联用决定渲染方式                                                                                                           | `boolean`                | `false`   | -    |
-| renderMode      | 只读渲染模式，默认 `'slate'`。`'slate'`：Slate 文档树（与编辑态一致）；`'markdown'`：轻量 `Markdown → hast → React`，无 Slate 依赖，仅 `readonly` 时生效 | `'slate' \| 'markdown'`  | `'slate'` | -    |
-| renderType      | `renderMode` 的别名，同时传入时以 `renderMode` 为准                                                                                                      | `'slate' \| 'markdown'`  | -         | -    |
-| toc             | 是否显示目录                                                                                                                                             | `boolean`                | `false`   | -    |
-| reportMode      | 是否开启报告模式                                                                                                                                         | `boolean`                | `false`   | -    |
-| slideMode       | 是否开启 PPT 模式                                                                                                                                        | `boolean`                | `false`   | -    |
-| compact         | 是否启用紧凑模式                                                                                                                                         | `boolean`                | `false`   | -    |
-| streaming       | 流式输出模式，同时传入时优先于 `typewriter`                                                                                                              | `boolean`                | -         | -    |
-| isFinished      | 流式是否完成（仅 `renderMode: 'markdown'`），未传入时回退到 `!streaming`                                                                                 | `boolean`                | -         | -    |
-| ~~typewriter~~  | **已废弃**：`streaming` 的别名，向下兼容，新代码请使用 `streaming`                                                                                       | `boolean`                | -         | -    |
-| throttleOptions | 流式限流与展示配置（仅 `renderMode: 'markdown'`），默认 `streaming` 时开启限流；逐词淡入由 `throttleOptions.fade` 控制（默认开启，传 `false` 关闭）      | `ContentThrottleOptions` | -         | -    |
-| deps            | MElement 刷新依赖                                                                                                                                        | `string[]`               | -         | -    |
-| children        | 子元素                                                                                                                                                   | `React.ReactNode`        | -         | -    |
+| 属性            | 说明                                                                                                                                                                                                                  | 类型                     | 默认值    | 版本 |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ | --------- | ---- |
+| initValue       | 初始 Markdown 文本内容                                                                                                                                                                                                | `string`                 | -         | -    |
+| initSchemaValue | 直接传入 Slate schema，优先级高于 `initValue`                                                                                                                                                                         | `Elements[]`             | -         | -    |
+| readonly        | 是否只读模式。与 `renderMode` 联用决定渲染方式                                                                                                                                                                        | `boolean`                | `false`   | -    |
+| renderMode      | 只读渲染模式，默认 `'slate'`。`'slate'`：Slate 文档树（与编辑态一致）；`'markdown'`：轻量 `Markdown → hast → React`，无 Slate 依赖，仅 `readonly` 时生效                                                              | `'slate' \| 'markdown'`  | `'slate'` | -    |
+| renderType      | `renderMode` 的别名，同时传入时以 `renderMode` 为准                                                                                                                                                                   | `'slate' \| 'markdown'`  | -         | -    |
+| toc             | 是否显示目录                                                                                                                                                                                                          | `boolean`                | `false`   | -    |
+| reportMode      | 是否开启报告模式                                                                                                                                                                                                      | `boolean`                | `false`   | -    |
+| slideMode       | 是否开启 PPT 模式                                                                                                                                                                                                     | `boolean`                | `false`   | -    |
+| compact         | 是否启用紧凑模式                                                                                                                                                                                                      | `boolean`                | `false`   | -    |
+| streaming       | 流式输出模式，同时传入时优先于 `typewriter`                                                                                                                                                                           | `boolean`                | -         | -    |
+| isFinished      | 流式是否完成（仅 `renderMode: 'markdown'`），未传入时回退到 `!streaming`                                                                                                                                              | `boolean`                | -         | -    |
+| ~~typewriter~~  | **已废弃**：`streaming` 的别名，向下兼容，新代码请使用 `streaming`                                                                                                                                                    | `boolean`                | -         | -    |
+| throttleOptions | 流式限流与展示配置（仅 `renderMode: 'markdown'`）。默认 `streaming` 时开启限流；GPT 风格逐词淡入由 `fade` 控制（默认 `true`，传 `false` 关闭）。详见 [MarkdownRenderer](./markdown-renderer#content-throttle-options) | `ContentThrottleOptions` | -         | -    |
+| deps            | MElement 刷新依赖                                                                                                                                                                                                     | `string[]`               | -         | -    |
+| children        | 子元素                                                                                                                                                                                                                | `React.ReactNode`        | -         | -    |
 
 #### ContentThrottleOptions
 
-| 属性                      | 说明                                        | 类型      | 默认值 |
-| ------------------------- | ------------------------------------------- | --------- | ------ |
-| charsPerFrame             | 每帧最多推进字符数                          | `number`  | `3`    |
-| speed                     | 速度倍率                                    | `number`  | `1`    |
-| flushOnComplete           | 流式结束时是否立即展示剩余内容              | `boolean` | `true` |
-| backgroundInterval        | 标签页不可见时的轮询间隔（ms）              | `number`  | `100`  |
-| backgroundBatchMultiplier | 后台每批字符相对前台倍数                    | `number`  | `10`   |
-| enabled                   | 为 `false` 时关闭限流，流式内容即时渲染     | `boolean` | `true` |
-| fade                      | GPT 风格逐词淡入开关，仅 `streaming` 时生效 | `boolean` | `true` |
+| 属性                      | 说明                                                         | 类型      | 默认值 |
+| ------------------------- | ------------------------------------------------------------ | --------- | ------ |
+| charsPerFrame             | 每帧最多推进字符数                                           | `number`  | `3`    |
+| speed                     | 速度倍率                                                     | `number`  | `1`    |
+| flushOnComplete           | 流式结束时是否立即展示剩余内容                               | `boolean` | `true` |
+| backgroundInterval        | 标签页不可见时的轮询间隔（ms）                               | `number`  | `100`  |
+| backgroundBatchMultiplier | 后台每批字符相对前台倍数                                     | `number`  | `10`   |
+| enabled                   | 为 `false` 时关闭限流，流式内容即时渲染                      | `boolean` | `true` |
+| fade                      | GPT 风格逐词淡入开关，仅 `streaming` 时生效；传 `false` 关闭 | `boolean` | `true` |
 
 #### 工具栏 (toolBar)
 
