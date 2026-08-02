@@ -101,6 +101,8 @@ export default defineConfig(({ mode }) => ({
     ],
     coverage: {
       provider: 'istanbul',
+      /** 有失败用例时仍写出报告，否则无法在 CI/本地根据缺口补测 */
+      reportOnFailure: true,
       reporter: ['text', 'json', 'html'],
       include: ['src/**/*.{ts,tsx,js,jsx}'],
       all: true,

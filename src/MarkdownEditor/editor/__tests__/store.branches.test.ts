@@ -1,0 +1,514 @@
+/**
+ * EditorStore 分支覆盖：错误/回退路径、空选区、私有辅助函数边界。
+ */
+import { render } from '@testing-library/react';
+import React from 'react';
+import { createEditor, Editor, Node, Transforms } from 'slate';
+import { withHistory } from 'slate-history';
+import { ReactEditor, withReact } from 'slate-react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { withMarkdown } from '../plugins/withMarkdown';
+import {
+  EditorStore,
+  EditorStoreContext,
+  useEditorStore,
+} from '../store';
+import * as parserMdToSchemaModule from '../parser/parserMdToSchema';
+
+vi.mock('slate-react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('slate-react')>();
+  return {
+    ...actual,
+    ReactEditor: {
+      ...actual.ReactEditor,
+      focus: vi.fn(),
+      deselect: vi.fn(),
+      isFocused: vi.fn(() => false),
+      toSlateNode: vi.fn(() => ({
+        type: 'paragraph',
+        children: [{ text: '' }],
+      })),
+      findPath: vi.fn(() => [0]),
+    },
+    withReact: (editor: any) => editor,
+  };
+});
+
+describe('EditorStore 分支覆盖', () => {
+  let editor: any;
+  let editorRef: React.MutableRefObject<any>;
+  let store: EditorStore;
+
+  const createTestEditor = () => {
+    const base = withMarkdown(withHistory(withReact(createEditor())));
+    base.children = [{ type: 'paragraph', children: [{ text: '' }] }];
+    return base;
+  };
+
+  beforeEach(() => {
+    editor = createTestEditor();
+    editorRef = { current: editor };
+    store = new EditorStore(editorRef);
+    vi.mocked(ReactEditor.isFocused).mockReturnValue(false);
+    vi.mocked(ReactEditor.deselect).mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  describe('setRuntimeConfig', () => {
+    it('应分别更新 plugins、markdownToHtmlOptions、parserConfig', () => {
+      const plugins = [{ name: 'p' }] as any;
+      const htmlOpts = { gfm: true } as any;
+      const parserCfg = { formula: true } as any;
+
+      store.setRuntimeConfig({ plugins });
+      expect(store.plugins).toBe(plugins);
+
+      store.setRuntimeConfig({ markdownToHtmlOptions: htmlOpts });
+      store.setRuntimeConfig({ parserConfig: parserCfg });
+
+      store.getHtmlContent();
+      expect(store.plugins).toBe(plugins);
+    });
+
+    it('传入 undefined 字段时不覆盖已有配置', () => {
+      const plugins = [{ name: 'keep' }] as any;
+      store.setRuntimeConfig({ plugins });
+      store.setRuntimeConfig({});
+      expect(store.plugins).toBe(plugins);
+    });
+  });
+
+  describe('_safeDeselect', () => {
+    it('编辑器聚焦时跳过 deselect', () => {
+      vi.mocked(ReactEditor.isFocused).mockReturnValue(true);
+      (store as any)._safeDeselect();
+      expect(ReactEditor.deselect).not.toHaveBeenCalled();
+    });
+
+    it('deselect 抛 InvalidStateError 时应静默忽略', () => {
+      vi.mocked(ReactEditor.isFocused).mockReturnValue(false);
+      vi.mocked(ReactEditor.deselect).mockImplementation(() => {
+        throw new DOMException('collapseToEnd', 'InvalidStateError');
+      });
+      expect(() => (store as any)._safeDeselect()).not.toThrow();
+    });
+  });
+
+  describe('findLatest', () => {
+    it('head 单子节点（SUPPORT_TYPING_TAG）应直接返回当前 index', () => {
+      const node = {
+        type: 'head',
+        children: [{ text: 'title' }],
+      };
+      expect((store as any).findLatest(node, [0])).toEqual([0]);
+    });
+
+    it('单子节点无 type 的 leaf 容器应直接返回 index', () => {
+      const node = {
+        type: 'list',
+        children: [{ text: 'leaf only' }],
+      };
+      expect((store as any).findLatest(node, [1])).toEqual([1]);
+    });
+
+    it('多子节点应递归到最末子路径', () => {
+      const node = {
+        type: 'list',
+        children: [
+          { type: 'paragraph', children: [{ text: 'a' }] },
+          {
+            type: 'list',
+            children: [{ type: 'paragraph', children: [{ text: 'b' }] }],
+          },
+        ],
+      };
+      expect((store as any).findLatest(node, [0])).toEqual([0, 1, 0]);
+    });
+  });
+
+  describe('insertLink 边界', () => {
+    it('无 selection 时不插入', () => {
+      editor.selection = null;
+      const insertSpy = vi.spyOn(Transforms, 'insertNodes');
+      store.insertLink('https://x.com');
+      expect(insertSpy).not.toHaveBeenCalled();
+    });
+
+    it('非折叠选区时不插入', () => {
+      editor.selection = {
+        anchor: { path: [0, 0], offset: 0 },
+        focus: { path: [0, 0], offset: 3 },
+      };
+      const insertSpy = vi.spyOn(Transforms, 'insertNodes');
+      store.insertLink('https://x.com');
+      expect(insertSpy).not.toHaveBeenCalled();
+    });
+
+    it('table-cell 内应直接 insertNodes 链接', () => {
+      editor.children = [
+        {
+          type: 'table',
+          children: [
+            {
+              type: 'table-row',
+              children: [
+                { type: 'table-cell', children: [{ text: '' }] },
+              ],
+            },
+          ],
+        },
+      ] as any;
+      editor.selection = {
+        anchor: { path: [0, 0, 0, 0], offset: 0 },
+        focus: { path: [0, 0, 0, 0], offset: 0 },
+      };
+      const insertSpy = vi.spyOn(Transforms, 'insertNodes');
+
+      store.insertLink('https://cell.link');
+
+      expect(insertSpy).toHaveBeenCalledWith(
+        editor,
+        expect.objectContaining({
+          text: 'https://cell.link',
+          url: 'https://cell.link',
+        }),
+        { select: true },
+      );
+    });
+  });
+
+  describe('setMDContent 空内容与 cancel', () => {
+    it('空字符串且当前非空时应 clearContent', () => {
+      editor.children = [
+        { type: 'paragraph', children: [{ text: 'existing' }] },
+      ];
+      store.setMDContent('');
+      expect(Node.string(editor)).toBe('');
+    });
+
+    it('无进行中的 RAF 时 cancelSetMDContent 为 no-op', () => {
+      expect(() => store.cancelSetMDContent()).not.toThrow();
+    });
+
+    it('_setLongContentSync 全空 chunk 时不替换内容', () => {
+      editor.children = [
+        { type: 'paragraph', children: [{ text: 'keep' }] },
+      ];
+      store.setMDContent('   \n\n   \n\n   ', undefined, {
+        chunkSize: 1,
+        useRAF: false,
+      });
+      expect(Node.string(editor)).toBe('keep');
+    });
+  });
+
+  describe('_splitMarkdown 围栏分支', () => {
+    it('代码块内双换行不应拆分', () => {
+      const md = '```js\na\n\nb\n```\n\nafter';
+      const chunks = (store as any)._splitMarkdown(md, /\n\n/);
+      expect(chunks.some((c: string) => c.includes('a\n\nb'))).toBe(true);
+    });
+
+    it('波浪线围栏应识别且不拆分内部', () => {
+      const md = '~~~\nline1\n\nline2\n~~~\n\nout';
+      const fence = (store as any)._matchFence(md, 0);
+      expect(fence).toEqual(expect.objectContaining({ marker: '~' }));
+      const chunks = (store as any)._splitMarkdown(md, /\n\n/);
+      expect(chunks.join('')).toContain('line1\n\nline2');
+    });
+
+    it('正则分隔符无 g 标志时应自动补 g', () => {
+      const matches = (store as any)._collectSeparatorMatches('a|b|c', /\|/);
+      expect(matches).toHaveLength(2);
+    });
+
+    it('_isLineStart 在 position=0 返回 true', () => {
+      expect((store as any)._isLineStart('abc', 0)).toBe(true);
+    });
+  });
+
+  describe('_parseAndSetContentWithRAF 异常路径', () => {
+    it('editor 实例失效时应 reject', async () => {
+      const chunks = Array(12).fill('chunk text');
+      const promise = (store as any)._parseAndSetContentWithRAF(
+        chunks,
+        [],
+        50,
+        undefined,
+        undefined,
+      );
+      editorRef.current = null as any;
+      await expect(promise).rejects.toThrow(
+        'Editor instance is no longer available',
+      );
+    });
+
+    it('单 chunk 解析失败应 warn 并继续', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const parserSpy = vi.spyOn(parserMdToSchemaModule, 'parserMdToSchema');
+      parserSpy.mockImplementation((md: string) => {
+        if (md === 'bad') throw new Error('chunk fail');
+        return { schema: [{ type: 'paragraph', children: [{ text: md }] }] };
+      });
+
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+        setTimeout(() => cb(0), 0);
+        return 1;
+      });
+
+      await (store as any)._parseAndSetContentWithRAF(
+        ['ok', 'bad', 'ok2'],
+        [],
+        50,
+      );
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Failed to parse chunk'),
+        expect.any(Error),
+      );
+      parserSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    it('后续批次应 append 节点而非 replace', async () => {
+      vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+        setTimeout(() => cb(0), 0);
+        return 1;
+      });
+      const insertSpy = vi.spyOn(Transforms, 'insertNodes');
+
+      const chunks = Array.from({ length: 12 }, (_, i) => `# chunk ${i}`);
+      await (store as any)._parseAndSetContentWithRAF(chunks, [], 50);
+
+      const appendCalls = insertSpy.mock.calls.filter(
+        ([, , opts]) =>
+          Array.isArray(opts?.at) && (opts.at[0] as number) > 0,
+      );
+      expect(appendCalls.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('compareNodes / 表格 / executeOperations', () => {
+    it('finished 不同应生成 replace', () => {
+      const ops: any[] = [];
+      (store as any).compareNodes(
+        { type: 'paragraph', finished: true, children: [{ text: 'a' }] },
+        { type: 'paragraph', finished: false, children: [{ text: 'a' }] },
+        [0],
+        ops,
+      );
+      expect(ops.some((op) => op.type === 'replace')).toBe(true);
+    });
+
+    it('_isNodeEqual hash 缺失时返回 false', () => {
+      expect(
+        (store as any)._isNodeEqual({ hash: 'a' }, { hash: undefined }),
+      ).toBe(false);
+    });
+
+    it('_isSameTableStructure 相同 id 视为同结构', () => {
+      expect(
+        (store as any)._isSameTableStructure(
+          { id: 't1', children: [] },
+          { id: 't1', children: [{ children: [{}] }] },
+          [],
+          [{ children: [{}, {}] }],
+        ),
+      ).toBe(true);
+    });
+
+    it('executeOperations insert 路径已存在时跳过', () => {
+      editor.children = [{ type: 'paragraph', children: [{ text: 'x' }] }];
+      editor.hasPath = vi.fn((path: number[]) => path[0] === 0);
+
+      (store as any).executeOperations([
+        {
+          type: 'insert',
+          path: [0],
+          node: { type: 'paragraph', children: [{ text: 'dup' }] },
+          priority: 10,
+        },
+      ]);
+
+      expect(editor.children).toHaveLength(1);
+    });
+
+    it('executeOperations insert 父路径无效时跳过', () => {
+      editor.hasPath = vi.fn(() => false);
+      const insertSpy = vi.spyOn(Transforms, 'insertNodes');
+
+      (store as any).executeOperations([
+        {
+          type: 'insert',
+          path: [5],
+          node: { type: 'paragraph', children: [{ text: 'x' }] },
+          priority: 10,
+        },
+      ]);
+
+      expect(insertSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('replaceText / replaceTextInSelection', () => {
+    beforeEach(() => {
+      editor.children = [
+        { type: 'paragraph', children: [{ text: 'Alpha beta' }] },
+      ];
+    });
+
+    it('wholeWord + caseSensitive 组合替换', () => {
+      const count = store.replaceText('Alpha', 'Z', {
+        caseSensitive: true,
+        wholeWord: true,
+        replaceAll: true,
+      });
+      expect(count).toBe(1);
+      expect(editor.children[0].children[0].text).toBe('Z beta');
+    });
+
+    it('选区内 wholeWord 仅替换匹配词', () => {
+      editor.selection = {
+        anchor: { path: [0, 0], offset: 0 },
+        focus: { path: [0, 0], offset: 10 },
+      };
+      const count = store.replaceTextInSelection('Alpha', 'Z', {
+        wholeWord: true,
+        replaceAll: false,
+      });
+      expect(count).toBe(1);
+    });
+
+    it('_buildRegexFlags 区分大小写且无 global', () => {
+      expect((store as any)._buildRegexFlags(true, false)).toBe('');
+      expect((store as any)._buildRegexFlags(false, true)).toBe('ig');
+    });
+  });
+
+  describe('拖拽 _handleDragEnd', () => {
+    it('direction=bottom 时使用 Path.next', () => {
+      editor.children = [
+        { type: 'paragraph', children: [{ text: 'a' }] },
+        { type: 'paragraph', children: [{ text: 'b' }] },
+      ];
+      const dragEl = document.createElement('div');
+      const targetEl = document.createElement('div');
+      store.draggedElement = dragEl as any;
+
+      vi.mocked(ReactEditor.toSlateNode).mockImplementation((_, el: any) => {
+        if (el === dragEl) return editor.children[0];
+        return editor.children[1];
+      });
+      vi.mocked(ReactEditor.findPath).mockImplementation((_, node: any) =>
+        node === editor.children[0] ? [0] : [1],
+      );
+
+      const moveSpy = vi.spyOn(Transforms, 'moveNodes');
+      (store as any)._handleDragEnd({
+        el: targetEl,
+        direction: 'bottom',
+        top: 0,
+        left: 0,
+      });
+
+      // 同父且 drag 在 target 前时，toPath 会 Path.previous 调整为 [1]
+      expect(moveSpy).toHaveBeenCalledWith(
+        editor,
+        expect.objectContaining({ at: [0], to: [1] }),
+      );
+      store.draggedElement = null;
+    });
+
+    it('media 节点不重置 draggable', () => {
+      const mediaNode = { type: 'media', children: [{ text: '' }] };
+      const paraNode = { type: 'paragraph', children: [{ text: '' }] };
+      editor.children = [mediaNode, paraNode];
+
+      const dragEl = document.createElement('div');
+      dragEl.draggable = true;
+      const targetEl = document.createElement('div');
+      store.draggedElement = dragEl as any;
+
+      vi.mocked(ReactEditor.toSlateNode).mockImplementation((_, el: any) =>
+        el === dragEl ? mediaNode : paraNode,
+      );
+      vi.mocked(ReactEditor.findPath).mockImplementation((_, node: any) =>
+        node === mediaNode ? [0] : [1],
+      );
+
+      (store as any)._handleDragEnd({
+        el: targetEl,
+        direction: 'top',
+        top: 0,
+        left: 0,
+      });
+
+      expect(dragEl.draggable).toBe(true);
+      store.draggedElement = null;
+    });
+  });
+
+  describe('focus 外层 catch', () => {
+    it('Editor.end 抛错时应 console.error 且不白屏', () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(Editor, 'end').mockImplementation(() => {
+        throw new Error('end failed');
+      });
+
+      store.focus();
+
+      expect(errSpy).toHaveBeenCalledWith(
+        '移动光标失败:',
+        expect.any(Error),
+      );
+      errSpy.mockRestore();
+    });
+  });
+
+  describe('useEditorStore', () => {
+    it('Provider 内应返回上下文', () => {
+      const ctx = { store, readonly: false } as any;
+      let captured: any;
+      const Test = () => {
+        captured = useEditorStore();
+        return null;
+      };
+      render(
+        React.createElement(
+          EditorStoreContext.Provider,
+          { value: ctx },
+          React.createElement(Test),
+        ),
+      );
+      expect(captured).toBe(ctx);
+    });
+  });
+
+  describe('setState 对象式更新', () => {
+    it('非函数参数应按 key 写入 store', () => {
+      store.setState({ inputComposition: true } as any);
+      expect(store.inputComposition).toBe(true);
+    });
+  });
+
+  describe('_isValidNode 剩余分支', () => {
+    it('bulleted-list / numbered-list 空 children 无效', () => {
+      expect(
+        (store as any)._isValidNode({
+          type: 'bulleted-list',
+          children: [],
+        }),
+      ).toBe(false);
+      expect(
+        (store as any)._isValidNode({
+          type: 'numbered-list',
+          children: [],
+        }),
+      ).toBe(false);
+    });
+  });
+});
