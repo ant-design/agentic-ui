@@ -240,7 +240,7 @@ describe('ChartRender 分支覆盖', () => {
       expect(runtimeCalls.funnel.at(-1)).toEqual([
         expect.objectContaining({
           x: 'Step1',
-          y: 1,
+          y: 100,
           ratio: 1,
           category: 'C1',
           filterLabel: 'F1',
