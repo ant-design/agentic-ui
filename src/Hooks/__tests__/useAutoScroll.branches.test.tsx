@@ -641,6 +641,666 @@ describe('useAutoScroll targeted coverage (aligned with current impl)', () => {
     expect(mo.disconnect).toHaveBeenCalled();
   });
 
+  it('touchmove 距底超过 pinThreshold 时解除 pinned', () => {
+    const onScrollStateChange = vi.fn();
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({
+        onScrollStateChange,
+        scrollTolerance: 20,
+        pinThreshold: 50,
+      });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 1000,
+              scrollTop: 200,
+              clientHeight: 100,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+    flushRaf();
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      container.dispatchEvent(new TouchEvent('touchmove', { bubbles: true }));
+    });
+
+    expect(onScrollStateChange).toHaveBeenCalled();
+    const lastCall =
+      onScrollStateChange.mock.calls[
+        onScrollStateChange.mock.calls.length - 1
+      ][0];
+    expect(lastCall.isPinned).toBe(false);
+  });
+
+  it('touchmove 贴底时恢复 pinned', () => {
+    const onScrollStateChange = vi.fn();
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({
+        onScrollStateChange,
+        scrollTolerance: 20,
+        pinThreshold: 80,
+      });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 500,
+              scrollTop: 100,
+              clientHeight: 100,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+    flushRaf();
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      container.dispatchEvent(
+        new WheelEvent('wheel', { deltaY: -50, bubbles: true }),
+      );
+    });
+    container.scrollTop = 380;
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      container.dispatchEvent(new TouchEvent('touchmove', { bubbles: true }));
+    });
+
+    expect(onScrollStateChange).toHaveBeenCalled();
+    const lastCall =
+      onScrollStateChange.mock.calls[
+        onScrollStateChange.mock.calls.length - 1
+      ][0];
+    expect(lastCall.isPinned).toBe(true);
+    expect(lastCall.isAtBottom).toBe(true);
+  });
+
+  it('keydown ArrowUp 解除 pinned', () => {
+    const onScrollStateChange = vi.fn();
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({
+        onScrollStateChange,
+        scrollTolerance: 20,
+      });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 500,
+              scrollTop: 100,
+              clientHeight: 100,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+          tabIndex={0}
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+    flushRaf();
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      container.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }),
+      );
+    });
+
+    expect(onScrollStateChange).toHaveBeenCalled();
+    const lastCall =
+      onScrollStateChange.mock.calls[
+        onScrollStateChange.mock.calls.length - 1
+      ][0];
+    expect(lastCall.isPinned).toBe(false);
+  });
+
+  it('keydown ArrowDown 下一帧恢复 pinned', () => {
+    const onScrollStateChange = vi.fn();
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({
+        onScrollStateChange,
+        scrollTolerance: 20,
+      });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 500,
+              scrollTop: 100,
+              clientHeight: 100,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+          tabIndex={0}
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+    flushRaf();
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      container.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }),
+      );
+    });
+    container.scrollTop = 380;
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      container.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+      );
+    });
+    act(() => {
+      flushRaf(1);
+    });
+
+    expect(onScrollStateChange).toHaveBeenCalled();
+    const lastCall =
+      onScrollStateChange.mock.calls[
+        onScrollStateChange.mock.calls.length - 1
+      ][0];
+    expect(lastCall.isPinned).toBe(true);
+  });
+
+  it('wheel 正向滚动清零累计上滑距离', () => {
+    const onScrollStateChange = vi.fn();
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({
+        onScrollStateChange,
+        scrollTolerance: 20,
+      });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 1000,
+              scrollTop: 200,
+              clientHeight: 100,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+    flushRaf();
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      container.dispatchEvent(
+        new WheelEvent('wheel', { deltaY: -8, bubbles: true, timeStamp: 100 }),
+      );
+      container.dispatchEvent(
+        new WheelEvent('wheel', { deltaY: 10, bubbles: true, timeStamp: 110 }),
+      );
+      container.dispatchEvent(
+        new WheelEvent('wheel', { deltaY: -8, bubbles: true, timeStamp: 120 }),
+      );
+    });
+
+    expect(onScrollStateChange).not.toHaveBeenCalled();
+  });
+
+  it('无 ResizeObserver 时仍注册 MutationObserver', () => {
+    const originalRo = global.ResizeObserver;
+    // @ts-expect-error 测试降级分支
+    delete global.ResizeObserver;
+
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll();
+      return (
+        <div
+          ref={containerRef as React.RefObject<HTMLDivElement>}
+          data-testid="container"
+        />
+      );
+    };
+    render(<Wrapper />);
+    expect(observers.moInstances.length).toBeGreaterThan(0);
+    expect(observers.roInstances.length).toBe(0);
+
+    global.ResizeObserver = originalRo;
+  });
+
+  it('程序 scroll 事件被过滤，不重复触发 notifyState', () => {
+    const onScrollStateChange = vi.fn();
+    const { result } = renderHook(() =>
+      useAutoScroll({ onScrollStateChange, scrollTolerance: 20 }),
+    );
+    const div = document.createElement('div');
+    installScrollMetrics(div, {
+      scrollHeight: 500,
+      scrollTop: 0,
+      clientHeight: 100,
+    });
+    act(() => {
+      (
+        result.current
+          .containerRef as React.MutableRefObject<HTMLDivElement | null>
+      ).current = div;
+    });
+    flushRaf();
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      result.current.scrollToBottom('auto');
+    });
+
+    const callsAfterProgrammatic = onScrollStateChange.mock.calls.length;
+    act(() => {
+      div.dispatchEvent(new Event('scroll'));
+    });
+    expect(onScrollStateChange.mock.calls.length).toBe(callsAfterProgrammatic);
+  });
+
+  it('MutationObserver 新增直接子节点时 observe 并触发 onResize', () => {
+    const onResize = vi.fn();
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({ onResize });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 100,
+              scrollTop: 0,
+              clientHeight: 50,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+    const mo = observers.moInstances[0];
+    const ro = observers.roInstances[0];
+    const newChild = document.createElement('div');
+
+    act(() => {
+      mo.callback(
+        [
+          {
+            type: 'childList',
+            target: container,
+            addedNodes: [newChild] as unknown as NodeList,
+            removedNodes: [] as unknown as NodeList,
+          } as MutationRecord,
+        ],
+        mo as unknown as MutationObserver,
+      );
+    });
+    act(() => {
+      flushRaf(2);
+    });
+
+    expect(ro.observe).toHaveBeenCalledWith(newChild);
+    expect(onResize).toHaveBeenCalled();
+  });
+
+  it('MutationObserver 移除直接子节点时 unobserve', () => {
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll();
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 100,
+              scrollTop: 0,
+              clientHeight: 50,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+        >
+          <div data-testid="child" />
+        </div>
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+    const mo = observers.moInstances[0];
+    const ro = observers.roInstances[0];
+    const removedChild = container.querySelector('[data-testid="child"]')!;
+
+    act(() => {
+      mo.callback(
+        [
+          {
+            type: 'childList',
+            target: container,
+            addedNodes: [] as unknown as NodeList,
+            removedNodes: [removedChild] as unknown as NodeList,
+          } as MutationRecord,
+        ],
+        mo as unknown as MutationObserver,
+      );
+    });
+
+    expect(ro.unobserve).toHaveBeenCalledWith(removedChild);
+  });
+
+  it('MutationObserver characterData 变化触发 onContentChange', () => {
+    const onResize = vi.fn();
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({ onResize });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 100,
+              scrollTop: 0,
+              clientHeight: 50,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+        />
+      );
+    };
+    render(<Wrapper />);
+    const mo = observers.moInstances[0];
+
+    act(() => {
+      mo.callback(
+        [{ type: 'characterData' } as MutationRecord],
+        mo as unknown as MutationObserver,
+      );
+    });
+    act(() => {
+      flushRaf(2);
+    });
+
+    expect(onResize).toHaveBeenCalled();
+  });
+
+  it('未 pinned 时内容增长不自动滚动', () => {
+    let setScrollHeight: (v: number) => void = () => {};
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({ scrollBehavior: 'auto' });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            const state = installScrollMetrics(el, {
+              scrollHeight: 1000,
+              scrollTop: 200,
+              clientHeight: 50,
+            });
+            setScrollHeight = (v) => {
+              state.scrollHeight = v;
+            };
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+
+    act(() => {
+      container.dispatchEvent(
+        new WheelEvent('wheel', { deltaY: -50, bubbles: true }),
+      );
+    });
+    const scrollTopBefore = container.scrollTop;
+
+    setScrollHeight(1500);
+    const ro = observers.roInstances[0];
+    act(() => {
+      ro.callback([] as unknown as ResizeObserverEntry[]);
+    });
+    act(() => {
+      flushRaf(2);
+    });
+
+    expect(container.scrollTop).toBe(scrollTopBefore);
+  });
+
+  it('内容收缩距底有空隙时 smooth 跟随', () => {
+    let setScrollHeight: (v: number) => void = () => {};
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({
+        scrollBehavior: 'smooth',
+        scrollTolerance: 20,
+      });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            const state = installScrollMetrics(el, {
+              scrollHeight: 200,
+              scrollTop: 50,
+              clientHeight: 100,
+            });
+            setScrollHeight = (v) => {
+              state.scrollHeight = v;
+            };
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+
+    setScrollHeight(180);
+    const ro = observers.roInstances[0];
+    act(() => {
+      ro.callback([] as unknown as ResizeObserverEntry[]);
+    });
+    act(() => {
+      flushRaf();
+    });
+
+    expect(container.scrollTop).toBeGreaterThan(50);
+  });
+
+  it('deps 重挂载但内容未增长时不 jumpToBottom', () => {
+    let metricsInstalled = false;
+    const Wrapper = ({ deps }: { deps: number[] }) => {
+      const { containerRef } = useAutoScroll({ deps });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+            if (metricsInstalled) return;
+            metricsInstalled = true;
+            installScrollMetrics(el, {
+              scrollHeight: 100,
+              scrollTop: 50,
+              clientHeight: 50,
+            });
+          }}
+          data-testid="container"
+        />
+      );
+    };
+    const { rerender } = render(<Wrapper deps={[1]} />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+
+    rerender(<Wrapper deps={[2]} />);
+    expect(container.scrollTop).toBe(50);
+  });
+
+  it('pinThreshold 小于 scrollTolerance 时被 clamp 到 tolerance', () => {
+    const onScrollStateChange = vi.fn();
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({
+        onScrollStateChange,
+        scrollTolerance: 50,
+        pinThreshold: 10,
+      });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 500,
+              scrollTop: 300,
+              clientHeight: 100,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+    flushRaf();
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      container.dispatchEvent(new TouchEvent('touchmove', { bubbles: true }));
+    });
+
+    const lastCall =
+      onScrollStateChange.mock.calls[
+        onScrollStateChange.mock.calls.length - 1
+      ]?.[0];
+    expect(lastCall?.isPinned).toBe(false);
+  });
+
+  it('scrollToBottom 无 container 时不抛错', () => {
+    const { result } = renderHook(() => useAutoScroll());
+    expect(() => {
+      act(() => {
+        result.current.scrollToBottom('auto');
+        result.current.scrollToBottom('smooth');
+      });
+    }).not.toThrow();
+    expect(result.current.isAtBottom()).toBe(true);
+  });
+
+  it('keydown Shift+Space 视为上滑意图', () => {
+    const onScrollStateChange = vi.fn();
+    const Wrapper = () => {
+      const { containerRef } = useAutoScroll({
+        onScrollStateChange,
+        scrollTolerance: 20,
+      });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            installScrollMetrics(el, {
+              scrollHeight: 500,
+              scrollTop: 100,
+              clientHeight: 100,
+            });
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+          }}
+          data-testid="container"
+          tabIndex={0}
+        />
+      );
+    };
+    render(<Wrapper />);
+    const container = document.querySelector(
+      '[data-testid="container"]',
+    ) as HTMLDivElement;
+    flushRaf();
+    onScrollStateChange.mockClear();
+
+    act(() => {
+      container.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: ' ',
+          shiftKey: true,
+          bubbles: true,
+        }),
+      );
+    });
+
+    expect(onScrollStateChange).toHaveBeenCalled();
+    const lastCall =
+      onScrollStateChange.mock.calls[
+        onScrollStateChange.mock.calls.length - 1
+      ][0];
+    expect(lastCall.isPinned).toBe(false);
+  });
+
   it('depsKey 在 deps 含循环引用时使用单调递增 fallback，仍能触发重挂载', () => {
     const cyclic1: any = { name: 'a' };
     cyclic1.self = cyclic1;

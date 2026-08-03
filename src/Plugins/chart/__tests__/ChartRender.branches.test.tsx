@@ -18,6 +18,10 @@ const runtimeCalls = vi.hoisted(() => ({
   funnel: [] as any[][],
   scatter: [] as any[][],
   pie: [] as any[][],
+  bar: [] as any[][],
+  line: [] as any[][],
+  area: [] as any[][],
+  radar: [] as any[][],
 }));
 
 vi.mock('../../../Hooks/useIntersectionOnce', () => ({
@@ -39,8 +43,8 @@ const createRuntimeChart =
 
 vi.mock('../loadChartRuntime', () => ({
   loadChartRuntime: vi.fn(async () => ({
-    AreaChart: () => <div data-testid="area-chart" />,
-    BarChart: () => <div data-testid="bar-chart" />,
+    AreaChart: createRuntimeChart('area-chart', runtimeCalls.area),
+    BarChart: createRuntimeChart('bar-chart', runtimeCalls.bar),
     BoxPlotChart: createRuntimeChart('boxplot-chart', runtimeCalls.boxplot),
     DonutChart: createRuntimeChart('donut-chart', runtimeCalls.pie),
     FunnelChart: createRuntimeChart('funnel-chart', runtimeCalls.funnel),
@@ -48,8 +52,8 @@ vi.mock('../loadChartRuntime', () => ({
       'histogram-chart',
       runtimeCalls.histogram,
     ),
-    LineChart: () => <div data-testid="line-chart" />,
-    RadarChart: () => <div data-testid="radar-chart" />,
+    LineChart: createRuntimeChart('line-chart', runtimeCalls.line),
+    RadarChart: createRuntimeChart('radar-chart', runtimeCalls.radar),
     ScatterChart: createRuntimeChart('scatter-chart', runtimeCalls.scatter),
   })),
 }));
@@ -110,6 +114,10 @@ describe('ChartRender 分支覆盖', () => {
     runtimeCalls.funnel.length = 0;
     runtimeCalls.scatter.length = 0;
     runtimeCalls.pie.length = 0;
+    runtimeCalls.bar.length = 0;
+    runtimeCalls.line.length = 0;
+    runtimeCalls.area.length = 0;
+    runtimeCalls.radar.length = 0;
     process.env.NODE_ENV = 'development';
     Object.defineProperty(window, 'notRenderChart', {
       configurable: true,
@@ -288,5 +296,243 @@ describe('ChartRender 分支覆盖', () => {
     if (copyIcon) fireEvent.click(copyIcon);
     expect(successSpy).not.toHaveBeenCalled();
     successSpy.mockRestore();
+  });
+
+  it('复制 Markdown 有数据时弹出成功提示', async () => {
+    const copy = (await import('copy-to-clipboard')).default as ReturnType<
+      typeof vi.fn
+    >;
+    renderChart({
+      chartType: 'table',
+      chartData: [{ name: 'A', value: 1, key: '1' }],
+      config: runtimeConfig,
+      title: 'Table',
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.ant-agentic-plugin-chart__table')).toBeInTheDocument();
+    });
+
+    const copyIcon = document.querySelector('.anticon-copy');
+    if (copyIcon) fireEvent.click(copyIcon);
+    expect(copy).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(screen.getByText('复制成功')).toBeInTheDocument();
+    });
+  });
+
+  it('table 类型渲染表格 DOM', async () => {
+    renderChart({
+      chartType: 'table',
+      chartData: [{ name: 'A', value: 1, key: '1' }],
+      config: runtimeConfig,
+      title: 'My Table',
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.ant-agentic-plugin-chart__table')).toBeInTheDocument();
+    });
+    expect(screen.getByText('My Table')).toBeInTheDocument();
+  });
+
+  it('descriptions 类型渲染定义列表', async () => {
+    renderChart({
+      chartType: 'descriptions',
+      chartData: [
+        { name: 'A', value: 1 },
+        { name: 'B', value: 2 },
+      ],
+      config: runtimeConfig,
+      title: 'Desc',
+    });
+
+    await waitFor(() => {
+      expect(
+        document.querySelector('.ant-agentic-plugin-chart__descriptions'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('docCards 类型渲染卡片列表', async () => {
+    renderChart({
+      chartType: 'docCards',
+      chartData: [{ 名称: 'Doc A', 地址: 'Addr', 简介: 'Intro' }],
+      config: {
+        ...runtimeConfig,
+        columns: [
+          { title: '名称', dataIndex: '名称' },
+          { title: '地址', dataIndex: '地址' },
+          { title: '简介', dataIndex: '简介' },
+        ],
+        rest: { cardColumns: 2 },
+      },
+      title: 'Cards',
+    });
+
+    await waitFor(() => {
+      expect(
+        document.querySelector('.ant-agentic-plugin-chart__doc-cards'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('quadrant 类型渲染四象限图', async () => {
+    renderChart({
+      chartType: 'quadrant',
+      chartData: [{ name: 'Item', x: 1, y: 2, quadrant: 'Q1' }],
+      config: {
+        ...runtimeConfig,
+        columns: [
+          { title: 'Name', dataIndex: 'name' },
+          { title: 'X', dataIndex: 'x' },
+          { title: 'Y', dataIndex: 'y' },
+          { title: 'Quadrant', dataIndex: 'quadrant' },
+        ],
+      },
+      title: 'Quadrant',
+    });
+
+    await waitFor(() => {
+      expect(
+        document.querySelector('.ant-agentic-plugin-chart__quadrant-chart'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('donut 类型传递 convertDonutData', async () => {
+    renderChart({
+      chartType: 'donut',
+      chartData: [
+        { name: 'A', value: 10 },
+        { name: 'B', value: 20 },
+      ],
+      config: runtimeConfig,
+      title: 'Donut',
+    });
+
+    await screen.findByTestId('donut-chart');
+    await waitFor(() => {
+      expect(runtimeCalls.pie.at(-1)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: 'A', value: 10 }),
+        ]),
+      );
+    });
+  });
+
+  it('bar / line / column / area runtime 分支', async () => {
+    const cases = [
+      { chartType: 'bar' as const, testId: 'bar-chart', bucket: runtimeCalls.bar },
+      { chartType: 'line' as const, testId: 'line-chart', bucket: runtimeCalls.line },
+      { chartType: 'column' as const, testId: 'bar-chart', bucket: runtimeCalls.bar },
+      { chartType: 'area' as const, testId: 'area-chart', bucket: runtimeCalls.area },
+    ];
+
+    for (const { chartType, testId, bucket } of cases) {
+      const beforeLen = bucket.length;
+      const { unmount } = renderChart({
+        chartType,
+        chartData: [{ name: 'X1', value: 10, series: 'S1' }],
+        groupBy: 'series',
+        config: runtimeConfig,
+        title: chartType,
+      });
+      await screen.findByTestId(testId);
+      await waitFor(() => {
+        expect(bucket.length).toBeGreaterThan(beforeLen);
+        expect(bucket.at(-1)).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ x: 'X1', category: 'S1' }),
+          ]),
+        );
+      });
+      unmount();
+    }
+  });
+
+  it('radar 映射空 x/y 为序号与 0', async () => {
+    renderChart({
+      chartType: 'radar',
+      chartData: [{ name: '', value: '' }],
+      config: runtimeConfig,
+      title: 'Radar',
+    });
+
+    await screen.findByTestId('radar-chart');
+    await waitFor(() => {
+      expect(runtimeCalls.radar.at(-1)).toEqual([
+        expect.objectContaining({ x: '1', y: 0 }),
+      ]);
+    });
+  });
+
+  it('histogram 原始值路径（非预分箱）', async () => {
+    renderChart({
+      chartType: 'histogram',
+      chartData: [{ name: 'A', value: '42' }],
+      config: runtimeConfig,
+      title: 'HistRaw',
+    });
+
+    await screen.findByTestId('histogram-chart');
+    await waitFor(() => {
+      expect(runtimeCalls.histogram.at(-1)).toEqual([
+        expect.objectContaining({ value: 42 }),
+      ]);
+    });
+  });
+
+  it('funnel 无 ratio 时不附带 ratio 字段', async () => {
+    renderChart({
+      chartType: 'funnel',
+      chartData: [{ name: 'Step1', value: 50 }],
+      config: runtimeConfig,
+      title: 'FunnelNoRatio',
+    });
+
+    await screen.findByTestId('funnel-chart');
+    await waitFor(() => {
+      const last = runtimeCalls.funnel.at(-1)?.[0];
+      expect(last).toEqual(expect.objectContaining({ x: 'Step1', y: 50 }));
+      expect(last).not.toHaveProperty('ratio');
+    });
+  });
+
+  it('getFieldValueSafely 支持转义字段名', async () => {
+    renderChart({
+      chartType: 'bar',
+      chartData: [{ index_value: 99 }],
+      config: {
+        ...runtimeConfig,
+        x: 'index\\_value',
+        y: 'index\\_value',
+      },
+      title: 'Escaped',
+    });
+
+    await screen.findByTestId('bar-chart');
+    await waitFor(() => {
+      expect(runtimeCalls.bar.at(-1)).toEqual([
+        expect.objectContaining({ x: 99, y: 99 }),
+      ]);
+    });
+  });
+
+  it('isChartList 显示列数下拉', async () => {
+    const onColumnLengthChange = vi.fn();
+    renderChart({
+      chartType: 'table',
+      chartData: [{ name: 'A', value: 1, key: '1' }],
+      config: runtimeConfig,
+      title: 'List',
+      isChartList: true,
+      columnLength: 2,
+      onColumnLengthChange,
+    });
+
+    await waitFor(() => {
+      expect(document.querySelector('.ant-agentic-plugin-chart__table')).toBeInTheDocument();
+    });
+    expect(screen.getByText(/2.*列/)).toBeInTheDocument();
   });
 });
