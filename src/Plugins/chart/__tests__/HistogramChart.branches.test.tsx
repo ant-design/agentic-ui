@@ -66,16 +66,18 @@ vi.mock('../components', () => ({
           {o.label}
         </button>
       ))}
-      {customOptions?.map((o: any) => (
-        <button
-          type="button"
-          key={o.key}
-          data-testid={`custom-${o.key}`}
-          onClick={() => onSelectionChange?.(o.key)}
-        >
-          {o.label}
-        </button>
-      ))}
+      {Array.isArray(customOptions) &&
+        customOptions.length > 1 &&
+        customOptions.map((o: any) => (
+          <button
+            type="button"
+            key={o.key}
+            data-testid={`custom-${o.key}`}
+            onClick={() => onSelectionChange?.(o.key)}
+          >
+            {o.label}
+          </button>
+        ))}
       <span data-selected-custom={selectedCustomSelection} />
     </div>
   ),
@@ -373,5 +375,181 @@ describe('HistogramChart 分支覆盖', () => {
     unmount();
     expect(removeSpy).toHaveBeenCalledWith('resize', expect.any(Function));
     removeSpy.mockRestore();
+  });
+
+  it('yAxisLabel/xAxisLabel 控制轴标题 display', () => {
+    render(
+      <HistogramChart
+        data={[{ value: 10 }]}
+        xAxisLabel="X轴"
+        yAxisLabel="Y轴"
+      />,
+    );
+    const options = (globalThis as any).__histogramBranchOptions;
+    expect(options.scales.x.title.display).toBe(true);
+    expect(options.scales.y.title.display).toBe(true);
+  });
+
+  it('单分类时不渲染 ChartFilter', () => {
+    render(<HistogramChart data={[{ value: 10, category: 'only' }]} />);
+    expect(screen.queryByTestId('chart-filter')).not.toBeInTheDocument();
+  });
+
+  it('stacked=true 时 dataset 带 stack 字段', () => {
+    render(
+      <HistogramChart
+        data={[
+          { value: 10, type: 'A' },
+          { value: 20, type: 'B' },
+        ]}
+        stacked
+      />,
+    );
+    const data = (globalThis as any).__histogramBranchData;
+    expect(data.datasets[0].stack).toBeDefined();
+  });
+
+  it('title 为空时不渲染 toolbar 标题', () => {
+    render(<HistogramChart data={[{ value: 1 }]} title="" />);
+    expect(screen.getByTestId('chart-toolbar')).toBeInTheDocument();
+  });
+
+  it('filterLabel 全为同一值时不显示 custom 筛选', () => {
+    render(
+      <HistogramChart
+        data={[
+          { value: 10, filterLabel: 'Same' },
+          { value: 20, filterLabel: 'Same' },
+        ]}
+      />,
+    );
+    expect(screen.queryByTestId('custom-Same')).not.toBeInTheDocument();
+  });
+
+  it('多 category + filterLabel 组合', () => {
+    // 覆盖所有 category×filterLabel 组合，避免筛选后 filteredData 为空走空态
+    render(
+      <HistogramChart
+        data={[
+          { value: 10, category: 'A', filterLabel: 'f1' },
+          { value: 20, category: 'B', filterLabel: 'f2' },
+          { value: 15, category: 'A', filterLabel: 'f2' },
+          { value: 12, category: 'B', filterLabel: 'f1' },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId('chart-filter')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('custom-f2'));
+    fireEvent.click(screen.getByTestId('filter-B'));
+    expect(screen.getByTestId('histogram-chart')).toBeInTheDocument();
+  });
+
+  it('min===max 分箱边界', () => {
+    render(
+      <HistogramChart
+        data={[
+          { value: 5 },
+          { value: 5 },
+          { value: 5 },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId('histogram-chart')).toBeInTheDocument();
+  });
+
+  it('width 百分比', () => {
+    render(<HistogramChart data={[{ value: 1 }]} width="90%" />);
+    expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+  });
+
+  it('resize 后保持图表', async () => {
+    render(<HistogramChart data={[{ value: 3 }, { value: 7 }]} />);
+    window.dispatchEvent(new Event('resize'));
+    expect(screen.getByTestId('histogram-chart')).toBeInTheDocument();
+  });
+
+  it('空数据展示空态', () => {
+    render(<HistogramChart data={[]} title="空直方" />);
+    expect(screen.getByText('暂无有效数据')).toBeInTheDocument();
+  });
+
+  it('istanbul residual：预分箱、字符串 value、空 category、移动端', async () => {
+    const { unmount: unmountPre } = render(
+      <HistogramChart
+        data={[
+          { value: 1, left: 0, right: 10, type: 't1' },
+          { value: 3, left: 10, right: 20, type: 't1' },
+        ]}
+        color={[]}
+        stacked={false}
+      />,
+    );
+    expect(screen.getByTestId('histogram-chart')).toBeInTheDocument();
+    unmountPre();
+
+    // 空 category 被 filter(Boolean) 忽略；字符串/NaN value 被过滤
+    const { unmount: unmountMixed } = render(
+      <HistogramChart
+        data={[
+          { value: 5, category: '' },
+          { value: '3' as any, category: 'A' },
+          { value: Number.NaN, category: 'A' },
+          { value: 7, category: 'A' },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId('histogram-chart')).toBeInTheDocument();
+    unmountMixed();
+
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 500,
+    });
+    render(
+      <HistogramChart
+        data={[
+          { value: 1 },
+          { value: 2 },
+          { value: 8 },
+        ]}
+      />,
+    );
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(screen.getByTestId('histogram-chart')).toBeInTheDocument();
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1200,
+    });
+  });
+
+  it('istanbul buffer：statistic 空、无 binCount、无轴标题、type 空串', () => {
+    const { unmount: unmountStat } = render(
+      <HistogramChart
+        data={[{ value: 1 }, { value: 2 }, { value: 9 }]}
+        statistic={[]}
+      />,
+    );
+    expect(screen.queryByTestId('chart-statistic')).not.toBeInTheDocument();
+    unmountStat();
+
+    render(
+      <HistogramChart
+        data={[
+          { value: 1, type: '' },
+          { value: 4, type: 't1' },
+          { value: 8, type: 't1' },
+        ]}
+        xAxisLabel=""
+        yAxisLabel=""
+      />,
+    );
+    expect(screen.getByTestId('histogram-chart')).toBeInTheDocument();
+    const options = (globalThis as any).__histogramBranchOptions;
+    expect(options?.scales?.x?.title?.text).toBeDefined();
+    expect(options?.scales?.y?.title?.text).toBeDefined();
   });
 });

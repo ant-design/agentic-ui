@@ -1,10 +1,19 @@
 import '@testing-library/jest-dom';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { Modal } from 'antd';
 import React from 'react';
 import { Transforms } from 'slate';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EditorImage, ResizeImage } from '../../../editor/elements/Image';
+import {
+  EditorImage,
+  ReadonlyImage,
+  ResizeImage,
+} from '../../../editor/elements/Image';
+
+function resetFakeTimers() {
+  cleanup();
+  vi.clearAllTimers();
+}
 
 const storeState: any = {
   markdownEditorRef: { current: {} },
@@ -127,7 +136,7 @@ vi.mock('../../../../Utils/debugUtils', () => ({
   debugInfo: vi.fn(),
 }));
 
-vi.mock('../../../editor/elements/components/MediaErrorLink', () => ({
+vi.mock('../../../editor/components/MediaErrorLink', () => ({
   MediaErrorLink: ({ displayText }: any) => (
     <span data-testid="media-error-link">{displayText}</span>
   ),
@@ -146,15 +155,18 @@ const attrs: any = { 'data-slate-node': 'element' };
 
 describe('Image targeted coverage', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     storeState.markdownEditorRef = { current: {} };
+    storeState.editorProps = {};
+    storeState.readonly = false;
     vi.spyOn(Transforms, 'setNodes').mockImplementation(() => {});
     vi.spyOn(Transforms, 'removeNodes').mockImplementation(() => {});
     vi.clearAllMocks();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    // 仅 cleanup + clearTimers；勿 useRealTimers，避免 happy-dom 跨用例抖动
+    resetFakeTimers();
     vi.restoreAllMocks();
   });
 
@@ -321,5 +333,80 @@ describe('Image targeted coverage', () => {
     fireEvent.click(mediaContainer);
     vi.advanceTimersByTime(16);
     expect(screen.getByTestId('image-container')).toBeInTheDocument();
+  });
+
+  it('editorProps.image.render 自定义包装', () => {
+    storeState.editorProps = {
+      image: {
+        render: (_el: any, dom: React.ReactNode) => (
+          <div data-testid="custom-image-wrap">{dom}</div>
+        ),
+      },
+    };
+    // image.render 仅在 ReadonlyImage 路径生效（EditorImage 走 ResizeImage）
+    render(
+      <ReadonlyImage src="https://example.com/image.jpg" alt="Image Alt" />,
+    );
+    expect(screen.getByTestId('custom-image-wrap')).toBeInTheDocument();
+    storeState.editorProps = {};
+  });
+
+  it('finished=false 显示 Skeleton', () => {
+    render(
+      <EditorImage
+        element={{ ...baseElement, finished: false }}
+        attributes={attrs}
+      >
+        {null}
+      </EditorImage>,
+    );
+    expect(
+      screen.queryByTestId('skeleton-image') ||
+        screen.getByTestId('image-container'),
+    ).toBeTruthy();
+  });
+
+  it('缺少 mediaType 时仍可渲染', () => {
+    const { mediaType: _m, ...rest } = baseElement as any;
+    render(
+      <EditorImage element={{ ...rest, url: 'https://x.png' }} attributes={attrs}>
+        {null}
+      </EditorImage>,
+    );
+    expect(screen.getByTestId('image-container')).toBeInTheDocument();
+  });
+
+  it('错误态 MediaErrorLink 使用 alt 文案', () => {
+    const createdImgs: HTMLImageElement[] = [];
+    const originalCreate = Document.prototype.createElement.bind(
+      document,
+    ) as typeof document.createElement;
+    const createSpy = vi.spyOn(document, 'createElement').mockImplementation(((
+      tagName: string,
+    ) => {
+      const el = originalCreate(tagName) as any;
+      if (tagName === 'img') {
+        createdImgs.push(el);
+      }
+      return el;
+    }) as any);
+
+    render(
+      <EditorImage
+        element={{ ...baseElement, alt: '我的图', url: 'https://bad.png' }}
+        attributes={attrs}
+      >
+        {null}
+      </EditorImage>,
+    );
+
+    // EditorImage 探测 img.onerror → loadSuccess=false → MediaErrorLink(alt)
+    const probe = createdImgs.find((img) => img.crossOrigin === 'anonymous');
+    expect(probe).toBeTruthy();
+    act(() => {
+      probe!.onerror?.(new Event('error') as any);
+    });
+    expect(screen.getByTestId('media-error-link')).toHaveTextContent('我的图');
+    createSpy.mockRestore();
   });
 });

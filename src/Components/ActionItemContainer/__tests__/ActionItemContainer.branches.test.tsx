@@ -530,4 +530,79 @@ describe('ActionItemContainer branches', () => {
     expect(screen.getByText('plain-text')).toBeInTheDocument();
     expect(screen.getByText('Valid')).toBeInTheDocument();
   });
+
+  it('mouseEnter 非 menuDisabled 时应用 hover 类', async () => {
+    const items = createMockItems();
+    const { container } = render(
+      <TestWrapper>
+        <ActionItemContainer>{items}</ActionItemContainer>
+      </TestWrapper>,
+    );
+    const menuButton = queryMenuButton(container)!;
+    fireEvent.mouseEnter(menuButton);
+    expect(
+      container.querySelector('[class*="container-no-hover"]'),
+    ).toBeInTheDocument();
+  });
+
+  it('pointerUp 未平移时不阻止 click', () => {
+    const items = createMockItems();
+    const { container } = render(
+      <TestWrapper>
+        <ActionItemContainer>{items}</ActionItemContainer>
+      </TestWrapper>,
+    );
+    const containerEl = queryContainer(container)!;
+    fireEvent.pointerDown(containerEl, { button: 0, clientX: 100, pointerId: 1 });
+    fireEvent.pointerUp(containerEl, { pointerId: 1 });
+
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+    });
+    const preventSpy = vi.spyOn(clickEvent, 'preventDefault');
+    containerEl.dispatchEvent(clickEvent);
+    expect(preventSpy).not.toHaveBeenCalled();
+  });
+
+  it('size small / large 应用尺寸类名', () => {
+    const { container, rerender } = render(
+      <TestWrapper>
+        <ActionItemContainer size="small">{createMockItems()}</ActionItemContainer>
+      </TestWrapper>,
+    );
+    expect(queryContainer(container)?.className).toMatch(/small|container/);
+    rerender(
+      <TestWrapper>
+        <ActionItemContainer size="large">{createMockItems()}</ActionItemContainer>
+      </TestWrapper>,
+    );
+    expect(queryContainer(container)?.className).toMatch(/large|container/);
+  });
+
+  it('menuDisabled 时不渲染溢出菜单按钮', () => {
+    const { container } = render(
+      <TestWrapper>
+        <ActionItemContainer menuDisabled>{createMockItems(4)}</ActionItemContainer>
+      </TestWrapper>,
+    );
+    expect(queryMenuButton(container)).toBeFalsy();
+  });
+
+  it('非 HTMLElement 目标 pointerDown 不抛错', () => {
+    const { container } = render(
+      <TestWrapper>
+        <ActionItemContainer>{createMockItems()}</ActionItemContainer>
+      </TestWrapper>,
+    );
+    const containerEl = queryContainer(container)!;
+    expect(() =>
+      fireEvent.pointerDown(containerEl, {
+        button: 0,
+        clientX: 10,
+        pointerId: 2,
+        target: null,
+      }),
+    ).not.toThrow();
+  });
 });

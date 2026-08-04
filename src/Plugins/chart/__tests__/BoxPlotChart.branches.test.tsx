@@ -67,16 +67,18 @@ vi.mock('../components', () => ({
           {o.label}
         </button>
       ))}
-      {customOptions?.map((o: any) => (
-        <button
-          type="button"
-          key={o.key}
-          data-testid={`custom-${o.key}`}
-          onClick={() => onSelectionChange?.(o.key)}
-        >
-          {o.label}
-        </button>
-      ))}
+      {Array.isArray(customOptions) &&
+        customOptions.length > 1 &&
+        customOptions.map((o: any) => (
+          <button
+            type="button"
+            key={o.key}
+            data-testid={`custom-${o.key}`}
+            onClick={() => onSelectionChange?.(o.key)}
+          >
+            {o.label}
+          </button>
+        ))}
     </div>
   ),
   ChartStatistic: () => <div data-testid="chart-statistic-unused" />,
@@ -386,5 +388,295 @@ describe('BoxPlotChart 分支覆盖', () => {
     unmount();
     expect(removeSpy).toHaveBeenCalledWith('resize', expect.any(Function));
     removeSpy.mockRestore();
+  });
+
+  it('空数据数组时展示暂无有效数据', () => {
+    render(<BoxPlotChart data={[]} title="空箱线" />);
+    expect(screen.getByText('暂无有效数据')).toBeInTheDocument();
+    expect(screen.queryByTestId('boxplot-chart')).not.toBeInTheDocument();
+  });
+
+  it('tooltip raw 无 mean 时不输出均值行', () => {
+    render(
+      <BoxPlotChart data={[{ label: 'A', values: [1, 2, 3] }]} />,
+    );
+    const options = (globalThis as any).__boxplotBranchOptions;
+    const lines = options.plugins.tooltip.callbacks.label({
+      raw: { min: 1, q1: 1.5, median: 2, q3: 2.5, max: 3 },
+    });
+    expect(lines.some((line: string) => line.includes('均值'))).toBe(false);
+  });
+
+  it('xAxisLabel/yAxisLabel 写入 scale title', () => {
+    render(
+      <BoxPlotChart
+        data={[{ label: 'A', values: [1, 2, 3] }]}
+        xAxisLabel="分组"
+        yAxisLabel="数值"
+      />,
+    );
+    const options = (globalThis as any).__boxplotBranchOptions;
+    expect(options.scales.x.title).toEqual(
+      expect.objectContaining({ display: true, text: '分组' }),
+    );
+    expect(options.scales.y.title).toEqual(
+      expect.objectContaining({ display: true, text: '数值' }),
+    );
+  });
+
+  it('tooltip raw 含 mean 时输出均值行', () => {
+    render(
+      <BoxPlotChart data={[{ label: 'A', values: [1, 2, 3, 4, 5] }]} />,
+    );
+    const options = (globalThis as any).__boxplotBranchOptions;
+    const lines = options.plugins.tooltip.callbacks.label({
+      raw: { min: 1, q1: 2, median: 3, q3: 4, max: 5, mean: 3 },
+    });
+    expect(lines.some((line: string) => line.includes('均值'))).toBe(true);
+  });
+
+  it('width 字符串 px 写入 style', () => {
+    render(
+      <BoxPlotChart
+        data={[{ label: 'A', values: [1, 2, 3] }]}
+        width="520px"
+      />,
+    );
+    expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+  });
+
+  it('filterLabel + selectedFilter 组合筛选', async () => {
+    // 每个 category×filterLabel 都有数据，切换后仍保持图表（非空态）
+    render(
+      <BoxPlotChart
+        data={[
+          {
+            label: 'A',
+            values: [1, 2, 3, 4, 5],
+            category: 'c1',
+            filterLabel: 'f1',
+          },
+          {
+            label: 'B',
+            values: [2, 3, 4, 5, 6],
+            category: 'c2',
+            filterLabel: 'f2',
+          },
+          {
+            label: 'C',
+            values: [3, 4, 5, 6, 7],
+            category: 'c1',
+            filterLabel: 'f2',
+          },
+          {
+            label: 'D',
+            values: [4, 5, 6, 7, 8],
+            category: 'c2',
+            filterLabel: 'f1',
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId('chart-filter')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('custom-f2'));
+    fireEvent.click(screen.getByTestId('filter-c2'));
+    await waitFor(() => {
+      expect(screen.getByTestId('boxplot-chart')).toBeInTheDocument();
+    });
+  });
+
+  it('showOutliers=false 时仍渲染', () => {
+    render(
+      <BoxPlotChart
+        data={[{ label: 'A', values: [1, 2, 3, 100] }]}
+        showOutliers={false}
+      />,
+    );
+    expect(screen.getByTestId('boxplot-chart')).toBeInTheDocument();
+  });
+
+  it('筛选后无有效数据展示空态', async () => {
+    render(
+      <BoxPlotChart
+        data={[
+          {
+            label: 'A',
+            values: [1, 2, 3],
+            category: 'only',
+            filterLabel: 'x',
+          },
+          {
+            label: 'B',
+            values: [2, 3, 4],
+            category: 'other',
+            filterLabel: 'y',
+          },
+        ]}
+      />,
+    );
+    const filterBtn = screen.queryByTestId('filter-other');
+    if (filterBtn) {
+      fireEvent.click(filterBtn);
+    }
+    expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+  });
+
+  it('width 百分比与数字', () => {
+    const { rerender } = render(
+      <BoxPlotChart
+        data={[{ label: 'A', values: [1, 2, 3] }]}
+        width="80%"
+      />,
+    );
+    expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+    rerender(
+      <BoxPlotChart
+        data={[{ label: 'A', values: [1, 2, 3] }]}
+        width={400}
+      />,
+    );
+    expect(screen.getByTestId('boxplot-chart')).toBeInTheDocument();
+  });
+
+  it('多 type 数据集', () => {
+    render(
+      <BoxPlotChart
+        data={[
+          { label: 'A', values: [1, 2, 3], type: 't1' },
+          { label: 'A', values: [2, 3, 4], type: 't2' },
+        ]}
+      />,
+    );
+    expect(screen.getByTestId('boxplot-chart')).toBeInTheDocument();
+  });
+
+  it('resize 事件触发后仍保持图表', async () => {
+    render(<BoxPlotChart data={[{ label: 'A', values: [1, 2, 3] }]} />);
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(screen.getByTestId('boxplot-chart')).toBeInTheDocument();
+  });
+
+  it('istanbul residual：空 category/type、非法 values、移动端、无数据', async () => {
+    const { unmount: unmountMixed } = render(
+      <BoxPlotChart
+        data={[
+          { label: 'A', values: [1, 'x' as any, null as any, 2], type: '' },
+          { label: 'B', values: [3, 4, 5], category: '' },
+        ]}
+        color={[]}
+      />,
+    );
+    expect(screen.getByTestId('boxplot-chart')).toBeInTheDocument();
+    unmountMixed();
+
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 500,
+    });
+    const { unmount: unmountMobile } = render(
+      <BoxPlotChart data={[{ label: 'A', values: [1, 2, 3, 4, 5] }]} />,
+    );
+    await act(async () => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    expect(screen.getByTestId('boxplot-chart')).toBeInTheDocument();
+    unmountMobile();
+    Object.defineProperty(window, 'innerWidth', {
+      writable: true,
+      configurable: true,
+      value: 1200,
+    });
+
+    render(<BoxPlotChart data={[]} />);
+    expect(screen.getByTestId('chart-container')).toBeInTheDocument();
+    expect(screen.getByText('暂无有效数据')).toBeInTheDocument();
+  });
+
+  it('istanbul buffer：statistic 空、tooltip raw 缺失、轴标签假值', () => {
+    const { unmount: unmountStat } = render(
+      <BoxPlotChart
+        data={[{ label: 'A', values: [1, 2, 3, 4, 5] }]}
+        statistic={[]}
+      />,
+    );
+    expect(screen.queryByTestId('chart-statistic')).not.toBeInTheDocument();
+    unmountStat();
+
+    render(
+      <BoxPlotChart
+        data={[{ label: 'A', values: [1, 2, 3, 4, 5] }]}
+      />,
+    );
+    const options = (globalThis as any).__boxplotBranchOptions;
+    const labelCb = options?.plugins?.tooltip?.callbacks?.label;
+    expect(labelCb?.({ raw: undefined })).toBe('');
+    const partial = labelCb?.({ raw: { q1: 1, q3: 3 } });
+    expect(Array.isArray(partial)).toBe(true);
+    expect(partial.join('\n')).toContain('-');
+
+    render(
+      <BoxPlotChart
+        data={[{ label: 'A', values: [2, 4, 6, 8] }]}
+        xAxisLabel=""
+        yAxisLabel=""
+      />,
+    );
+    const axes = (globalThis as any).__boxplotBranchOptions?.scales;
+    expect(axes?.x?.title?.text).toBe('');
+    expect(axes?.y?.title?.text).toBe('');
+  });
+
+  it('istanbul fill：全异常值、空色槽、关网格图例', () => {
+    render(
+      <BoxPlotChart
+        data={[
+          {
+            label: 'A',
+            type: 't1',
+            values: [1, 1, 1, 1, 1, 1000],
+          },
+          {
+            label: 'B',
+            type: 't2',
+            values: [2, 2, 2, 2, 2, -999],
+          },
+        ]}
+        color={['', undefined as any]}
+        showOutliers
+        showGrid={false}
+        showLegend={false}
+      />,
+    );
+    const data = (globalThis as any).__boxplotBranchData;
+    expect(data?.datasets?.length).toBeGreaterThan(0);
+    const opts = (globalThis as any).__boxplotBranchOptions;
+    expect(opts?.plugins?.legend?.display).toBe(false);
+    expect(opts?.scales?.x?.grid?.display).toBe(false);
+    const labelCb = opts?.plugins?.tooltip?.callbacks?.label;
+    if (typeof labelCb === 'function') {
+      labelCb({
+        raw: { min: 1, q1: 1, median: 1, q3: 1, max: 1 },
+      });
+    }
+  });
+
+  it('istanbul after：单点 values；颜色假值；关异常点', () => {
+    render(
+      <BoxPlotChart
+        data={[
+          { label: 'Solo', type: '', values: [5] },
+          { label: 'Pair', type: 't', values: [1, 2] },
+        ]}
+        color={['', undefined as any]}
+        showOutliers={false}
+        xAxisLabel={undefined}
+        yAxisLabel={undefined}
+      />,
+    );
+    const data = (globalThis as any).__boxplotBranchData;
+    expect(data?.datasets?.length).toBeGreaterThan(0);
   });
 });

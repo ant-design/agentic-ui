@@ -258,7 +258,7 @@ export function Media({
   const initial = useRefFunction(async () => {
     let type = getMediaType(element?.url, element.alt);
     type = !type ? 'image' : type;
-    const finalType = ['image', 'video', 'autio', 'attachment'].includes(type!)
+    const finalType = ['image', 'video', 'audio', 'attachment'].includes(type!)
       ? type!
       : 'other';
     setState({
@@ -632,6 +632,7 @@ export function Media({
   }, [
     state().type,
     state()?.url,
+    state().loadSuccess,
     element.finished,
     showAsText,
     (element as any)?.rawMarkdown,

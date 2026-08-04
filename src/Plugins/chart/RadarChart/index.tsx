@@ -385,6 +385,11 @@ const RadarChart: React.FC<RadarChartProps> = ({
             return;
           }
 
+          // 无有效 dataPoints 时不创建 tooltip DOM
+          if (!tooltip.dataPoints || tooltip.dataPoints.length === 0) {
+            return;
+          }
+
           // 获取或创建自定义 tooltip 元素
           let tooltipEl = document.getElementById('custom-radar-tooltip');
           if (!tooltipEl) {
@@ -394,11 +399,6 @@ const RadarChart: React.FC<RadarChartProps> = ({
             tooltipEl.style.pointerEvents = 'none';
             tooltipEl.style.transition = 'all 0.1s ease';
             document.body.appendChild(tooltipEl);
-          }
-
-          // 获取数据，添加安全检查
-          if (!tooltip.dataPoints || tooltip.dataPoints.length === 0) {
-            return;
           }
 
           const dataPoint = tooltip.dataPoints[0];

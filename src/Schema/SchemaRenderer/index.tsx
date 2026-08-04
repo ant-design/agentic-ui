@@ -437,11 +437,14 @@ const SchemaRendererComponent: React.FC<SchemaRendererProps> = ({
       const dataWithFallbacks = { ...mergedData };
 
       Object.entries(properties || {}).forEach(([key, property]) => {
-        if (
+        const value = dataWithFallbacks[key];
+        const isMissingValue =
           !(key in dataWithFallbacks) ||
-          dataWithFallbacks[key] === undefined ||
-          dataWithFallbacks[key] === null
-        ) {
+          value === undefined ||
+          value === null ||
+          (property.type === 'string' && value === '');
+
+        if (isMissingValue) {
           switch (property.type) {
             case 'array':
               dataWithFallbacks[key] = [];
@@ -767,6 +770,10 @@ a:active {
         </div>
       )
     );
+  }
+
+  if (!validationResult?.valid && !debug) {
+    return null;
   }
 
   return (

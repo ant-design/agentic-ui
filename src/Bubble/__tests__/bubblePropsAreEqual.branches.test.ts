@@ -457,4 +457,289 @@ describe('bubblePropsAreEqual branches', () => {
       ),
     ).toBe(false);
   });
+
+  it('returns true when classNames references are equal', () => {
+    const classNames = { root: 'r', content: 'c' };
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ classNames }),
+        baseProps({ classNames }),
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false when styles nested object values differ', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ styles: { root: { padding: 1, margin: 0 } } }),
+        baseProps({ styles: { root: { padding: 1, margin: 1 } } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns true when styles both sides missing key via Set union', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ styles: { root: { padding: 1 } } }),
+        baseProps({ styles: { root: { padding: 1 }, content: undefined } as any }),
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false when preMessage id differs even if content same', () => {
+    const pre: MessageBubbleData = { id: 'p1', role: 'user', content: 'same' };
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ preMessage: pre }),
+        baseProps({ preMessage: { ...pre, id: 'p2' } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns true when meta empty objects shallow-equal', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ originData: baseOrigin({ meta: {} }) }),
+        baseProps({ originData: baseOrigin({ meta: {} }) }),
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false when userBubbleProps nested value differs', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ userBubbleProps: { cfg: { x: 1 } } }),
+        baseProps({ userBubbleProps: { cfg: { x: 2 } } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns false when aiBubbleProps missing top-level key', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ aiBubbleProps: { a: 1, b: 2 } }),
+        baseProps({ aiBubbleProps: { a: 1 } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns true when shouldShowCopy function references match', () => {
+    const fn = () => true;
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ shouldShowCopy: fn }),
+        baseProps({ shouldShowCopy: fn }),
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false when meta description differs', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ originData: baseOrigin({ meta: { description: 'a' } }) }),
+        baseProps({ originData: baseOrigin({ meta: { description: 'b' } }) }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns false when meta backgroundColor differs', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({
+          originData: baseOrigin({ meta: { backgroundColor: '#fff' } }),
+        }),
+        baseProps({
+          originData: baseOrigin({ meta: { backgroundColor: '#000' } }),
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns true when meta only differs on non-affecting keys', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ originData: baseOrigin({ meta: { foo: 1 } as any }) }),
+        baseProps({ originData: baseOrigin({ meta: { foo: 2 } as any }) }),
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false when meta metadata nested value differs', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({
+          originData: baseOrigin({
+            meta: { metadata: { traceId: 'a' } },
+          }),
+        }),
+        baseProps({
+          originData: baseOrigin({
+            meta: { metadata: { traceId: 'b' } },
+          }),
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns true when both meta metadata missing', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ originData: baseOrigin({ meta: { title: 't' } }) }),
+        baseProps({ originData: baseOrigin({ meta: { title: 't' } }) }),
+      ),
+    ).toBe(true);
+  });
+
+  it('returns false when aIBubbleProps nested differs', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ aIBubbleProps: { x: { y: 1 } } }),
+        baseProps({ aIBubbleProps: { x: { y: 2 } } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns false when docListProps primitive top-level differs', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ docListProps: { mode: 'a' } }),
+        baseProps({ docListProps: { mode: 'b' } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('returns true when inline style shallow-equal via empty fallback', () => {
+    expect(
+      bubblePropsAreEqual(baseProps({ style: undefined }), baseProps({})),
+    ).toBe(true);
+  });
+
+  it('returns false when originData one side undefined', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ originData: baseOrigin() }),
+        baseProps({ originData: undefined }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('bubblePropsAreEqual istanbul residual', () => {
+  it('config 同长度不同键走 !(k in rb) 分支', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ customConfig: { a: 1 } }),
+        baseProps({ customConfig: { b: 1 } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('config 顶层数组值走 Array.isArray else 分支', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ customConfig: { list: [1, 2] } }),
+        baseProps({ customConfig: { list: [1, 2] } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('styles 一侧数组一侧对象返回 false', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ styles: { root: [1] as any } }),
+        baseProps({ styles: { root: { padding: 1 } } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('meta metadata 一侧缺失一侧存在', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({
+          originData: baseOrigin({ meta: { title: 't', metadata: { k: 1 } } }),
+        }),
+        baseProps({
+          originData: baseOrigin({ meta: { title: 't' } }),
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  it('meta metadata 空对象不计入 affect', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({
+          originData: baseOrigin({ meta: { metadata: {} } }),
+        }),
+        baseProps({
+          originData: baseOrigin({ meta: { foo: 1 } as any }),
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('avatar 一侧 null 一侧对象', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ avatar: null as any }),
+        baseProps({ avatar: { title: 'a' } }),
+      ),
+    ).toBe(false);
+  });
+
+  it('style 引用不同但浅相等', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ style: { margin: 1 } }),
+        baseProps({ style: { margin: 1 } }),
+      ),
+    ).toBe(true);
+  });
+
+  it('classNames 一侧 null', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ classNames: { root: 'a' } }),
+        baseProps({ classNames: null as any }),
+      ),
+    ).toBe(false);
+  });
+
+  it('deps 同长度中间项相等末项不等', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ deps: [1, 2, 3] }),
+        baseProps({ deps: [1, 2, 9] }),
+      ),
+    ).toBe(false);
+  });
+
+  it('preMessage 同引用跳过比较', () => {
+    const pre: MessageBubbleData = { id: 'p1', role: 'user', content: 'hi' };
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ preMessage: pre }),
+        baseProps({ preMessage: pre }),
+      ),
+    ).toBe(true);
+  });
+
+  it('markdownRenderConfig 一侧 null', () => {
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ markdownRenderConfig: { a: 1 } as any }),
+        baseProps({ markdownRenderConfig: null as any }),
+      ),
+    ).toBe(false);
+  });
+
+  it('originData 同引用直接相等', () => {
+    const origin = baseOrigin();
+    expect(
+      bubblePropsAreEqual(
+        baseProps({ originData: origin }),
+        baseProps({ originData: origin }),
+      ),
+    ).toBe(true);
+  });
 });

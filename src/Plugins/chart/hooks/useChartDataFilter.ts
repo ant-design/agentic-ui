@@ -41,7 +41,7 @@ export const useChartDataFilter = (data: ChartDataItem[]) => {
       ...new Set(safeData.map((item) => item.category)),
     ].filter(Boolean);
     return uniqueCategories;
-  }, [dataHash]);
+  }, [safeData]);
 
   // 从数据中提取 filterLabel，过滤掉 undefined 值
   const validFilterLabels = useMemo(() => {
@@ -50,7 +50,7 @@ export const useChartDataFilter = (data: ChartDataItem[]) => {
       .filter(
         (filterLabel): filterLabel is string => filterLabel !== undefined,
       );
-  }, [dataHash]);
+  }, [safeData]);
 
   const filterLabels = useMemo(() => {
     return validFilterLabels.length > 0
@@ -73,6 +73,28 @@ export const useChartDataFilter = (data: ChartDataItem[]) => {
     }
   }, [categories, selectedFilter]);
 
+  // 同步 filterLabel 选中态：失效或 filterLabels 消失时清空，避免残留无效筛选
+  useEffect(() => {
+    if (!filterLabels || filterLabels.length === 0) {
+      if (selectedFilterLabel !== undefined) {
+        setSelectedFilterLabel(undefined);
+      }
+      return;
+    }
+    if (selectedFilterLabel && !filterLabels.includes(selectedFilterLabel)) {
+      setSelectedFilterLabel(undefined);
+    }
+  }, [filterLabels, selectedFilterLabel]);
+
+  const resolvedFilterLabel = useMemo(() => {
+    if (!filterLabels?.length || !selectedFilterLabel) {
+      return undefined;
+    }
+    return filterLabels.includes(selectedFilterLabel)
+      ? selectedFilterLabel
+      : undefined;
+  }, [filterLabels, selectedFilterLabel]);
+
   // 筛选数据
   const filteredData = useMemo(() => {
     const base = selectedFilter
@@ -80,15 +102,15 @@ export const useChartDataFilter = (data: ChartDataItem[]) => {
       : safeData;
 
     const withFilterLabel =
-      !filterLabels || !selectedFilterLabel
+      !filterLabels || !resolvedFilterLabel
         ? base
-        : base.filter((item) => item.filterLabel === selectedFilterLabel);
+        : base.filter((item) => item.filterLabel === resolvedFilterLabel);
 
     // 统一过滤掉 x 为空（null/undefined）的数据，避免后续 toString 报错
     return withFilterLabel.filter(
       (item) => item.x !== null && item.x !== undefined,
     );
-  }, [dataHash, selectedFilter, filterLabels, selectedFilterLabel]);
+  }, [dataHash, selectedFilter, filterLabels, resolvedFilterLabel, safeData]);
 
   // 筛选器选项
   const filterOptions = useMemo(() => {

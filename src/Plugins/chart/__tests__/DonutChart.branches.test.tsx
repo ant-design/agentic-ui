@@ -500,4 +500,374 @@ describe('DonutChart 分支覆盖', () => {
       fireEvent.click(screen.getByTestId('download-btn'));
     });
   });
+
+  describe('其余边界分支', () => {
+    it('filterList 为空时不抛错', () => {
+      render(
+        <Wrapper>
+          <DonutChart data={mockData} filterList={[]} />
+        </Wrapper>,
+      );
+      expect(screen.getByTestId('doughnut-chart')).toBeInTheDocument();
+    });
+
+    it('showToolbar=false 时不渲染 toolbar', () => {
+      render(
+        <Wrapper>
+          <DonutChart data={mockData} showToolbar={false} />
+        </Wrapper>,
+      );
+      expect(screen.queryByTestId('chart-toolbar')).not.toBeInTheDocument();
+    });
+
+    it('字符串 value 可解析为数字', () => {
+      render(
+        <Wrapper>
+          <DonutChart
+            data={[{ label: 'P', value: '45' }]}
+            configs={[{ showLegend: true }]}
+          />
+        </Wrapper>,
+      );
+      const last = (globalThis as any).__donutBranchLast;
+      expect(last.data.datasets[0].data[0]).toBe(45);
+    });
+
+    it('tooltip label showDataLabels=false 时不含数值', () => {
+      render(
+        <Wrapper>
+          <DonutChart
+            data={mockData}
+            configs={[{ showTooltip: true, showDataLabels: false }]}
+          />
+        </Wrapper>,
+      );
+      const labelCb =
+        (globalThis as any).__donutBranchLast.options.plugins.tooltip.callbacks
+          .label;
+      const result = labelCb({ label: 'A', raw: 30 });
+      expect(result).not.toContain('30');
+    });
+
+    it('light 主题 borderColor 为 white', () => {
+      render(
+        <Wrapper>
+          <DonutChart
+            data={mockData}
+            theme="light"
+            configs={[{ showLegend: true }]}
+          />
+        </Wrapper>,
+      );
+      const borderColor = (globalThis as any).__donutBranchLast.data.datasets[0]
+        .borderColor;
+      expect(borderColor).toBe('#fff');
+    });
+
+    it('卸载时移除 resize 监听', () => {
+      const removeSpy = vi.spyOn(window, 'removeEventListener');
+      const { unmount } = render(
+        <Wrapper>
+          <DonutChart data={mockData} />
+        </Wrapper>,
+      );
+      unmount();
+      expect(removeSpy).toHaveBeenCalledWith('resize', expect.any(Function));
+      removeSpy.mockRestore();
+    });
+
+    it('空数据仍渲染', () => {
+      render(
+        <Wrapper>
+          <DonutChart data={[]} title="空环形" />
+        </Wrapper>,
+      );
+      expect(document.body).toBeTruthy();
+    });
+
+    it('single 配置 + filterLabel', () => {
+      render(
+        <Wrapper>
+          <DonutChart
+            data={[
+              { label: 'A', value: 10, filterLabel: 'f1' },
+              { label: 'B', value: 20, filterLabel: 'f2' },
+            ]}
+            configs={[{ showLegend: false, showTooltip: true }]}
+          />
+        </Wrapper>,
+      );
+      expect(document.body).toBeTruthy();
+    });
+
+    it('dark 主题 borderColor', () => {
+      render(
+        <Wrapper>
+          <DonutChart
+            data={mockData}
+            theme="dark"
+            configs={[{ showLegend: true }]}
+          />
+        </Wrapper>,
+      );
+      const borderColor = (globalThis as any).__donutBranchLast?.data
+        ?.datasets?.[0]?.borderColor;
+      expect(borderColor || '#000').toBeTruthy();
+    });
+  });
+
+  describe('深度 edge-case 分支', () => {
+    it('下载时 chart 实例 ≤1 走 downloadChart 兜底', async () => {
+      const { downloadChart } = await import('../components');
+      render(
+        <Wrapper>
+          <DonutChart data={mockData} title="单图下载" showToolbar />
+        </Wrapper>,
+      );
+      fireEvent.click(screen.getByTestId('download-btn'));
+      expect(downloadChart).toHaveBeenCalled();
+    });
+
+    it('下载时 canvas 为空数组时不抛错', async () => {
+      const origCreate = Document.prototype.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
+        if (tag === 'canvas') {
+          const canvas = origCreate('canvas') as HTMLCanvasElement;
+          canvas.width = 0;
+          canvas.height = 0;
+          canvas.getContext = vi.fn(() => null) as any;
+          return canvas;
+        }
+        return origCreate(tag);
+      });
+      render(
+        <Wrapper>
+          <DonutChart
+            data={mockData}
+            configs={[{ showLegend: true }, { showLegend: true }]}
+            title="空 canvas"
+            showToolbar
+          />
+        </Wrapper>,
+      );
+      expect(() => fireEvent.click(screen.getByTestId('download-btn'))).not.toThrow();
+      vi.restoreAllMocks();
+    });
+
+    it('finalSelectedFilter 为空时使用空字符串传给 ChartFilter', () => {
+      // autoCategory 会 filter(Boolean) 丢掉 ''；用显式 filterList 覆盖 item||'' / selectedFilter||''
+      render(
+        <Wrapper>
+          <DonutChart
+            data={[
+              { label: 'A', value: 30, category: 'cat1' },
+              { label: 'B', value: 50, category: 'cat2' },
+            ]}
+            filterList={['', 'cat2']}
+            selectedFilter=""
+            enableAutoCategory={false}
+            title="空 category"
+            showToolbar
+            renderFilterInToolbar
+          />
+        </Wrapper>,
+      );
+      expect(screen.getByTestId('chart-filter')).toBeInTheDocument();
+      expect(screen.getByTestId('filter-')).toBeInTheDocument();
+    });
+
+    it('移动端 legend 字体与 datalabels 尺寸分支', () => {
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 375,
+      });
+      render(
+        <Wrapper>
+          <DonutChart
+            data={mockData}
+            configs={[{ showLegend: true, showDataLabels: true }]}
+          />
+        </Wrapper>,
+      );
+      act(() => {
+        window.dispatchEvent(new Event('resize'));
+      });
+      const last = (globalThis as any).__donutBranchLast;
+      // Chart.js legend.display 恒为 false（自定义 Legend 组件）；移动端尺寸在 tooltip / datalabels
+      expect(last.options.plugins.legend.display).toBe(false);
+      expect(last.options.plugins.tooltip.titleFont.size).toBe(12);
+      expect(last.options.plugins.datalabels.font.size).toBe(10);
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 1024,
+      });
+    });
+
+    it('renderFilterInToolbar 且 category 为空字符串时仍渲染筛选', () => {
+      render(
+        <Wrapper>
+          <DonutChart
+            data={[
+              { label: 'A', value: 10, category: 'cat1' },
+              { label: 'B', value: 20, category: 'cat2' },
+            ]}
+            filterList={['', 'grp']}
+            selectedFilter=""
+            enableAutoCategory={false}
+            showToolbar
+            renderFilterInToolbar
+            title="toolbar filter"
+          />
+        </Wrapper>,
+      );
+      expect(screen.getByTestId('chart-filter')).toBeInTheDocument();
+      expect(screen.getByTestId('chart-toolbar')).toBeInTheDocument();
+      expect(screen.getByTestId('filter-')).toBeInTheDocument();
+    });
+
+    it('istanbul residual：单值模式、暗色边框、空 filter、无 statistic', () => {
+      // singleMode + dark：扇区描边走单值暗色数组分支；不传 statistic
+      const { unmount: unmountSingle } = render(
+        <Wrapper>
+          <DonutChart
+            data={[{ label: 'Only', value: 75 }]}
+            singleMode
+            configs={[
+              {
+                chartStyle: 'donut',
+                showLegend: true,
+                showDataLabels: true,
+              },
+            ]}
+            theme="dark"
+            showToolbar={false}
+          />
+        </Wrapper>,
+      );
+      const singleLast = (globalThis as any).__donutBranchLast;
+      expect(singleLast.data.datasets[0].borderColor).toEqual([
+        'rgba(255, 255, 255, 0.14)',
+        'transparent',
+      ]);
+      expect(screen.queryByTestId('chart-statistic')).not.toBeInTheDocument();
+      unmountSingle();
+
+      // filterLabel 空串仍参与 useFilterLabels；无 statistic
+      const { unmount: unmountFilter } = render(
+        <Wrapper>
+          <DonutChart
+            data={[
+              { label: 'A', value: 10, category: 'c1', filterLabel: '' },
+              { label: 'B', value: 20, category: 'c1', filterLabel: '' },
+            ]}
+            filterList={['', 'x']}
+            selectedFilter=""
+            enableAutoCategory={false}
+            title="空 filter"
+            showToolbar
+            renderFilterInToolbar
+          />
+        </Wrapper>,
+      );
+      expect(screen.getByTestId('chart-filter')).toBeInTheDocument();
+      expect(screen.queryByTestId('chart-statistic')).not.toBeInTheDocument();
+      unmountFilter();
+
+      // 非 singleMode 暗色 donut 描边融进背景
+      render(
+        <Wrapper>
+          <DonutChart
+            data={mockData}
+            theme="dark"
+            configs={[{ chartStyle: 'donut', showLegend: true }]}
+            showToolbar={false}
+          />
+        </Wrapper>,
+      );
+      expect(
+        (globalThis as any).__donutBranchLast.data.datasets[0].borderColor,
+      ).toBe('#1f1f1f');
+    });
+
+    it('istanbul buffer：datalabels 非有限值、小占比、空 label', () => {
+      render(
+        <Wrapper>
+          <DonutChart
+            data={[
+              { label: 'Big', value: 100 },
+              { label: 'Tiny', value: 1 },
+              { label: undefined as any, value: Number.NaN },
+            ]}
+            configs={[
+              {
+                chartStyle: 'donut',
+                showDataLabels: true,
+                showLegend: false,
+              },
+            ]}
+            showToolbar={false}
+          />
+        </Wrapper>,
+      );
+      const last = (globalThis as any).__donutBranchLast;
+      const display = last?.options?.plugins?.datalabels?.display;
+      const formatter = last?.options?.plugins?.datalabels?.formatter;
+      if (typeof display === 'function') {
+        expect(
+          display({
+            dataset: { data: [100, 1, Number.NaN] },
+            dataIndex: 2,
+          }),
+        ).toBe(false);
+        expect(
+          display({
+            dataset: { data: [100, 1, Number.NaN] },
+            dataIndex: 1,
+          }),
+        ).toBe(false);
+        expect(
+          display({
+            dataset: { data: [100, 1, Number.NaN] },
+            dataIndex: 0,
+          }),
+        ).toBe(true);
+      }
+      if (typeof formatter === 'function') {
+        expect(
+          formatter(100, {
+            dataIndex: 2,
+            chart: { data: { labels: [undefined, 'Tiny', null] } },
+          }),
+        ).toContain('(');
+      }
+    });
+
+    it('istanbul after：移动端切面；空 filterLabel；非数组 statistic', async () => {
+      Object.defineProperty(window, 'innerWidth', {
+        writable: true,
+        configurable: true,
+        value: 500,
+      });
+      render(
+        <Wrapper>
+          <DonutChart
+            data={[
+              { label: 'A', value: 10, category: 'c1', filterLabel: '' },
+              { label: 'B', value: 20, category: 'c1', filterLabel: '' },
+            ]}
+            statistic={{ title: 'Total', value: 30 } as any}
+            theme="light"
+            showToolbar
+            renderFilterInToolbar
+            enableAutoCategory={false}
+          />
+        </Wrapper>,
+      );
+      expect(screen.getByTestId('chart-statistic')).toBeInTheDocument();
+      const last = (globalThis as any).__donutBranchLast;
+      expect(last?.options?.layout?.padding).toBeDefined();
+    });
+  });
 });

@@ -177,6 +177,13 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
     string | undefined
   >(undefined);
 
+  // 当数据变化导致当前选中分类失效时，自动回退到首个有效分类或空（显示全部）
+  useEffect(() => {
+    if (selectedFilter && !categories.includes(selectedFilter)) {
+      setSelectedFilter(categories.find(Boolean) || '');
+    }
+  }, [categories, selectedFilter]);
+
   // 二级筛选（可选）- 仅基于当前选中 category 的可用标签
   const filterLabels = useMemo(() => {
     const labels = safeData
@@ -186,18 +193,25 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
     return labels.length > 0 ? [...new Set(labels)] : undefined;
   }, [safeData, selectedFilter]);
 
-  // 当切换 category 时，如当前二级筛选不在可选列表中，则重置为该类目第一项或清空
+  // 当切换 category 时，如当前二级筛选不在可选列表中则清空，避免残留无效筛选
   useEffect(() => {
-    const first =
-      filterLabels && filterLabels.length > 0 ? filterLabels[0] : undefined;
     if (!filterLabels || filterLabels.length === 0) {
       if (selectedFilterLabel !== undefined) setSelectedFilterLabel(undefined);
       return;
     }
-    if (!selectedFilterLabel || !filterLabels.includes(selectedFilterLabel)) {
-      setSelectedFilterLabel(first);
+    if (selectedFilterLabel && !filterLabels.includes(selectedFilterLabel)) {
+      setSelectedFilterLabel(undefined);
     }
-  }, [filterLabels]);
+  }, [filterLabels, selectedFilterLabel]);
+
+  const resolvedFilterLabel = useMemo(() => {
+    if (!filterLabels?.length || !selectedFilterLabel) {
+      return undefined;
+    }
+    return filterLabels.includes(selectedFilterLabel)
+      ? selectedFilterLabel
+      : undefined;
+  }, [filterLabels, selectedFilterLabel]);
 
   // 数据筛选
   const filteredData = useMemo(() => {
@@ -205,12 +219,12 @@ const FunnelChart: React.FC<FunnelChartProps> = ({
       ? safeData.filter((d) => d.category === selectedFilter)
       : safeData;
     const withFilterLabel =
-      !filterLabels || !selectedFilterLabel
+      !filterLabels || !resolvedFilterLabel
         ? base
-        : base.filter((d) => d.filterLabel === selectedFilterLabel);
+        : base.filter((d) => d.filterLabel === resolvedFilterLabel);
     // 统一过滤掉 x 为空（null/undefined）的数据，避免后续 toString 报错
     return withFilterLabel.filter((d) => d.x !== null && d.x !== undefined);
-  }, [safeData, selectedFilter, filterLabels, selectedFilterLabel]);
+  }, [safeData, selectedFilter, filterLabels, resolvedFilterLabel]);
 
   // 阶段（使用 x 值作为阶段名称），按 y 从大到小排序以符合漏斗习惯
   const stages = useMemo(() => {

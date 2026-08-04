@@ -164,21 +164,21 @@ export const getInsertOptions: (
       key: 'list',
       children: [
         {
-          label: [locale['b-list'] || '无序列表'],
+          label: [locale?.['b-list'] || '无序列表'],
           task: 'list',
           key: 'b-list',
           args: ['unordered'],
           icon: <UnorderedListOutlined />,
         },
         {
-          label: [locale['n-list'] || '有序列表'],
+          label: [locale?.['n-list'] || '有序列表'],
           task: 'list',
           key: 'n-list',
           args: ['ordered'],
           icon: <OrderedListOutlined />,
         },
         {
-          label: [locale['t-list'] || '任务列表'],
+          label: [locale?.['t-list'] || '任务列表'],
           task: 'list',
           key: 't-list',
           args: ['task'],

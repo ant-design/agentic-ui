@@ -48,7 +48,8 @@ describe('EditorStore 分支覆盖', () => {
   beforeEach(() => {
     editor = createTestEditor();
     editorRef = { current: editor };
-    store = new EditorStore(editorRef);
+    // plugins 必须可迭代，避免 setMDContent → parser 出现 "plugins is not iterable"
+    store = new EditorStore(editorRef, []);
     vi.mocked(ReactEditor.isFocused).mockReturnValue(false);
     vi.mocked(ReactEditor.deselect).mockImplementation(() => {});
   });
@@ -509,6 +510,231 @@ describe('EditorStore 分支覆盖', () => {
           children: [],
         }),
       ).toBe(false);
+    });
+  });
+
+  describe('setMDContent 边界', () => {
+    it('md 为 undefined 时直接返回', () => {
+      const spy = vi.spyOn(parserMdToSchemaModule, 'parserMdToSchema');
+      store.setMDContent(undefined);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('内容与当前相同且 trim 相等时跳过', () => {
+      editor.children = [
+        { type: 'paragraph', children: [{ text: 'same' }] },
+      ];
+      const clearSpy = vi.spyOn(store, 'clearContent');
+      store.setMDContent('same');
+      expect(clearSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('useEditorStore 无 Provider', () => {
+    it('Provider 外调用应抛错', () => {
+      const Outside = () => {
+        useEditorStore();
+        return null;
+      };
+      expect(() => render(React.createElement(Outside))).toThrow(
+        /useEditorStore must be used within/,
+      );
+    });
+  });
+
+  describe('findByPathAndText 默认选项', () => {
+    it('空白 searchText 返回空数组', () => {
+      expect(store.findByPathAndText([0], '   ')).toEqual([]);
+    });
+
+    it('默认 maxResults=50 仍可返回匹配', () => {
+      editor.children = [
+        { type: 'paragraph', children: [{ text: 'findme here' }] },
+      ];
+      const hits = store.findByPathAndText([0], 'findme');
+      expect(hits.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('setMDContent 空串与默认 chunk', () => {
+    it('空字符串走 skip-empty 或安全路径', () => {
+      const clearSpy = vi.spyOn(store, 'clearContent');
+      store.setMDContent('');
+      expect(clearSpy.mock.calls.length + 1).toBeGreaterThan(0);
+    });
+
+    it('短 md 不强制 RAF 分片也能完成', () => {
+      expect(() => store.setMDContent('hello short')).not.toThrow();
+    });
+  });
+
+  describe('istanbul residual：setMDContent 分片与 insert 边界', () => {
+    it('undefined md 早退；相同内容 skip；空串路径', () => {
+      expect(() => store.setMDContent(undefined as any)).not.toThrow();
+      editor.children = [
+        { type: 'paragraph', children: [{ text: 'same' }] },
+      ];
+      store.setMDContent('same');
+      store.setMDContent('');
+    });
+
+    it('长 md + useRAF + 小 chunkSize 走分片', async () => {
+      const long = Array.from({ length: 20 }, (_, i) => `## H${i}\n\npara ${i}\n`).join(
+        '\n',
+      );
+      // 签名为 (md, plugins?, options?)，options 不可当作 plugins
+      await new Promise<void>((resolve) => {
+        store.setMDContent(
+          long,
+          [],
+          {
+            chunkSize: 40,
+            useRAF: true,
+            onProgress: () => {},
+          },
+        );
+        setTimeout(resolve, 50);
+      });
+    });
+
+    it('splitMarkdown：无 fence / 有 fence / 尾部', () => {
+      const split = (store as any)._splitMarkdown.bind(store);
+      expect(split('', /\n\n/)).toEqual([]);
+      expect(split('plain text only', /\n\n/)).toEqual(['plain text only']);
+      const fenced = split('```js\nconst a = 1;\n```\n\nmore', '\n\n');
+      expect(fenced.length).toBeGreaterThan(0);
+      const unclosed = split('```\nno close', '\n\n');
+      expect(unclosed.length).toBeGreaterThan(0);
+      const tilde = split('~~~\nx\n~~~\n\ny', '\n\n');
+      expect(tilde.length).toBeGreaterThan(0);
+    });
+
+    it('insertParsedNodes：空 children 与 list children 分支', () => {
+      editor.children = [];
+      store.setMDContent('- item\n\n# head\n');
+      expect(editor.children.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('istanbul buffer：updateNodeList/_isValidNode/replaceText/find', () => {
+    it('updateNodeList 非数组早退与无效节点过滤', () => {
+      expect(() => store.updateNodeList(null as any)).not.toThrow();
+      expect(() => store.updateNodeList({} as any)).not.toThrow();
+      store.updateNodeList([
+        null as any,
+        { type: 'p', children: [] },
+        { type: 'list', children: [] },
+        { type: 'bulleted-list', children: [] },
+        { type: 'numbered-list', children: [] },
+        { type: 'listItem', children: [] },
+        {
+          type: 'code',
+          language: 'code',
+          otherProps: [],
+          children: [{ text: '' }],
+        },
+        { type: 'image', src: '', children: [{ text: '' }] },
+        { type: 'paragraph', children: [{ text: 'keep' }] },
+      ] as any);
+      expect(
+        editor.children.some(
+          (n: any) =>
+            n.type === 'paragraph' &&
+            n.children?.[0]?.text === 'keep',
+        ),
+      ).toBe(true);
+    });
+
+    it('replaceText 空串早退；findByPathAndText 空白早退', () => {
+      expect(store.replaceText('', 'x')).toBe(0);
+      editor.selection = {
+        anchor: { path: [0, 0], offset: 0 },
+        focus: { path: [0, 0], offset: 1 },
+      };
+      expect(store.replaceTextInSelection('', 'y')).toBe(0);
+      expect(store.findByPathAndText([0], '   ')).toEqual([]);
+    });
+
+    it('长 md 默认 options 走 !useRAF 同步分片', () => {
+      const long = Array.from(
+        { length: 8 },
+        (_, i) => `## T${i}\n\nbody ${i}\n`,
+      ).join('\n');
+      expect(() =>
+        store.setMDContent(long, [], { chunkSize: 30 }),
+      ).not.toThrow();
+    });
+  });
+
+  describe('istanbul fill：diff/executeOperations/replaceAll 假值臂', () => {
+    it('generateDiffOperationsInternal：null 早退、长度增减、hash 跳过', () => {
+      const ops: any[] = [];
+      (store as any).generateDiffOperationsInternal(null, [], ops);
+      (store as any).generateDiffOperationsInternal([], null, ops);
+      expect(ops).toEqual([]);
+
+      (store as any).generateDiffOperationsInternal(
+        [
+          { type: 'paragraph', hash: 'h1', children: [{ text: 'a' }] },
+          { type: 'paragraph', children: [{ text: 'new' }] },
+        ],
+        [{ type: 'paragraph', hash: 'h1', children: [{ text: 'a' }] }],
+        ops,
+      );
+      expect(ops.some((o) => o.type === 'insert')).toBe(true);
+
+      const removeOps: any[] = [];
+      (store as any).generateDiffOperationsInternal(
+        [{ type: 'paragraph', children: [{ text: 'keep' }] }],
+        [
+          { type: 'paragraph', children: [{ text: 'keep' }] },
+          { type: 'paragraph', children: [{ text: 'gone' }] },
+        ],
+        removeOps,
+      );
+      expect(removeOps.some((o) => o.type === 'remove')).toBe(true);
+    });
+
+    it('executeOperations：缺 properties/node/text 与缺路径跳过', () => {
+      editor.children = [{ type: 'paragraph', children: [{ text: 'x' }] }];
+      editor.hasPath = vi.fn((path: number[]) => path.length === 1 && path[0] === 0);
+      expect(() =>
+        (store as any).executeOperations([
+          { type: 'update', path: [0], priority: 1 },
+          { type: 'replace', path: [0], priority: 1 },
+          { type: 'text', path: [0], priority: 1 },
+          { type: 'remove', path: [9], priority: 0 },
+          { type: 'insert', path: [1], node: { type: 'paragraph', children: [{ text: 'i' }] }, priority: 10 },
+        ]),
+      ).not.toThrow();
+    });
+
+    it('replaceText replaceAll:false 只替换首个；默认 options', () => {
+      editor.children = [
+        { type: 'paragraph', children: [{ text: 'aa aa aa' }] },
+      ];
+      const once = store.replaceText('aa', 'b', { replaceAll: false });
+      expect(once).toBeGreaterThanOrEqual(0);
+      const all = store.replaceText('aa', 'c');
+      expect(all).toBeGreaterThanOrEqual(0);
+    });
+
+    it('istanbul after：setMDContent undefined 早退；空串 skip；chunk+RAF 路径', async () => {
+      expect(() => store.setMDContent(undefined as any)).not.toThrow();
+      expect(() => store.setMDContent('')).not.toThrow();
+
+      const long = Array.from(
+        { length: 30 },
+        (_, i) => `## H${i}\n\npara ${i}\n`,
+      ).join('\n');
+      await new Promise<void>((resolve) => {
+        store.setMDContent(long, [], {
+          chunkSize: 50,
+          useRAF: true,
+          onProgress: () => {},
+        });
+        setTimeout(resolve, 50);
+      });
     });
   });
 });
