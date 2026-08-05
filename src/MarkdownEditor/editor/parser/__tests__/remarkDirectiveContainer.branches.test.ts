@@ -8,6 +8,26 @@ function runPlugin(tree: any, options?: Parameters<typeof remarkDirectiveContain
 }
 
 describe('remarkDirectiveContainer 分支覆盖', () => {
+  it('istanbul one-miss: 不传 options 时使用默认空对象', () => {
+    const tree = {
+      type: 'root',
+      children: [
+        {
+          type: 'containerDirective',
+          name: 'info',
+          children: [{ type: 'paragraph', children: [{ type: 'text', value: 'b' }] }],
+        },
+      ],
+    };
+    const plugin = remarkDirectiveContainer();
+    plugin(tree);
+    expect(tree.children[0].data.hName).toBe('div');
+    expect(tree.children[0].data.hProperties.className).toEqual([
+      'markdown-container',
+      'info',
+    ]);
+  });
+
   it('containerDirective 默认 note 类名', () => {
     const tree = {
       type: 'root',

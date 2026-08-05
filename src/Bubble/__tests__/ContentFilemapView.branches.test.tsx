@@ -191,4 +191,32 @@ describe('ContentFilemapView 分支覆盖', () => {
     expect(screen.getByTestId('file-view-list')).toBeInTheDocument();
     warnSpy.mockRestore();
   });
+
+  it('placement right；空 blocks 返回 null', () => {
+    const { container, rerender } = render(
+      <ContentFilemapView blocks={[]} placement="right" />,
+    );
+    expect(container).toBeEmptyDOMElement();
+    rerender(
+      <ContentFilemapView
+        blocks={[makeBlock(validBody)]}
+        placement="right"
+      />,
+    );
+    expect(screen.getByTestId('file-view-list')).toBeInTheDocument();
+  });
+
+  it('uuid 缺省用 name；download name 默认；previewUrl/url 互换', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const body = JSON.stringify({
+      fileList: [{ name: 'n.png', url: 'https://u/n.png' }],
+    });
+    render(<ContentFilemapView blocks={[makeBlock(body)]} placement="left" />);
+    (lastFileMapViewProps.onPreview as any)?.({ url: 'https://u/n.png' });
+    (lastFileMapViewProps.onDownload as any)?.({
+      previewUrl: 'https://p/n.png',
+    });
+    expect(openSpy).toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
 });

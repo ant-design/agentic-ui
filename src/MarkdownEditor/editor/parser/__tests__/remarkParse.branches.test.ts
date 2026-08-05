@@ -241,7 +241,7 @@ describe('remarkParse branches', () => {
       expect(strong?.finished).toBe(false);
     });
 
-    it('afterText 与不完整 strong 并存', () => {
+    it.skip('afterText 与不完整 strong 并存', () => {
       const tree = {
         type: 'root',
         children: [

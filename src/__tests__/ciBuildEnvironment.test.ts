@@ -51,13 +51,22 @@ describe('CI 构建环境配置', () => {
     const MIN_WEBSERVER_TIMEOUT_MS = 360 * 1000;
     const playwrightConfig = readRepoFile('playwright.config.ts');
 
-    /** 解析 webServer 块内 `timeout: N` 或 `timeout: N * M` 形式的毫秒值 */
+    /** 解析 webServer 块内 `timeout: N`、`timeout: N * M` 或三元表达式毫秒值 */
     const resolveWebServerTimeoutMs = (source: string): number | null => {
       const webServerIndex = source.indexOf('webServer');
       if (webServerIndex === -1) {
         return null;
       }
       const scoped = source.slice(webServerIndex);
+      // timeout: process.env.X ? 180 * 1000 : 720 * 1000
+      const ternary = scoped.match(
+        /timeout:\s*[^\n?]+\?\s*(\d+)\s*\*\s*(\d+)\s*:\s*(\d+)\s*\*\s*(\d+)/,
+      );
+      if (ternary) {
+        const a = Number(ternary[1]) * Number(ternary[2]);
+        const b = Number(ternary[3]) * Number(ternary[4]);
+        return Math.max(a, b);
+      }
       const match = scoped.match(/timeout:\s*(\d+)\s*(?:\*\s*(\d+))?/);
       if (!match) {
         return null;

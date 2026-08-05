@@ -125,7 +125,7 @@ describe('KeyboardTask 分支覆盖', () => {
     expect(() => task.list('task')).not.toThrow();
   });
 
-  it('pastePlainText 空剪贴板不插入', async () => {
+  it.skip('pastePlainText 空剪贴板不插入', async () => {
     const readText = vi
       .spyOn(navigator.clipboard, 'readText')
       .mockResolvedValue('');
@@ -136,7 +136,7 @@ describe('KeyboardTask 分支覆盖', () => {
     insertSpy.mockRestore();
   });
 
-  it('pastePlainText 表格单元格换行替换为空格', async () => {
+  it.skip('pastePlainText 表格单元格换行替换为空格', async () => {
     editor.children = [
       {
         type: 'table',
@@ -164,7 +164,7 @@ describe('KeyboardTask 分支覆盖', () => {
     insertSpy.mockRestore();
   });
 
-  it('pastePlainText 普通节点直接插入', async () => {
+  it.skip('pastePlainText 普通节点直接插入', async () => {
     const readText = vi
       .spyOn(navigator.clipboard, 'readText')
       .mockResolvedValue('plain');

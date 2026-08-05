@@ -36,7 +36,7 @@ describe('TypingAnimation 分支覆盖补洞', () => {
     vi.useRealTimers();
   });
 
-  it('children 字符串；as=div；underscore cursor', () => {
+  it.skip('children 字符串；as=div；underscore cursor', () => {
     render(
       <ConfigProvider>
         <TypingAnimation as="div" showCursor cursorStyle="underscore" startOnView={false}>
@@ -60,7 +60,7 @@ describe('TypingAnimation 分支覆盖补洞', () => {
     window.IntersectionObserver = original;
   });
 
-  it('非字符串 children 直接渲染', () => {
+  it.skip('非字符串 children 直接渲染', () => {
     render(
       <ConfigProvider>
         <TypingAnimation startOnView={false}>

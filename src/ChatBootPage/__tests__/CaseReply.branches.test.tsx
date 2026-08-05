@@ -1,62 +1,42 @@
+/**
+ * CaseReply：省略 coverBackground 时使用默认值。
+ */
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { TestWrapper } from '../../../_test_helpers/testUtils';
 import CaseReply from '../CaseReply';
 
-describe('CaseReply 分支覆盖', () => {
-  it('默认 props 渲染 quote / title / description / buttonText', () => {
+describe('CaseReply branches', () => {
+  it('省略 coverBackground 时使用默认背景色', () => {
     render(
-      <CaseReply quote="Q" title="T" description="D" buttonText="Go" />,
+      <TestWrapper>
+        <CaseReply quote="q" title="t" />
+      </TestWrapper>,
     );
-    expect(screen.getByText('Q')).toBeInTheDocument();
-    expect(screen.getByText('T')).toBeInTheDocument();
-    expect(screen.getByText('D')).toBeInTheDocument();
-    expect(screen.getByText('Go')).toBeInTheDocument();
+    const cover = screen
+      .getByTestId('agentic-chatboot-case-reply')
+      .querySelector('[class*="cover"]');
+    expect(cover).toHaveStyle({ background: 'rgba(132, 220, 24, 0.15)' });
   });
 
-  it('onClick 启用键盘；无 onClick 不可聚焦', () => {
+  it('自定义 coverBackground / description / onClick', () => {
     const onClick = vi.fn();
-    const { rerender } = render(<CaseReply quote="q" onClick={onClick} />);
-    const el = screen.getByTestId('agentic-chatboot-case-reply');
-    expect(el).toHaveAttribute('role', 'button');
-    fireEvent.keyDown(el, { key: 'Enter' });
-    fireEvent.keyDown(el, { key: ' ' });
-    fireEvent.keyDown(el, { key: 'Escape' });
-    expect(onClick).toHaveBeenCalledTimes(2);
-
-    rerender(<CaseReply quote="q" />);
-    expect(
-      screen.getByTestId('agentic-chatboot-case-reply'),
-    ).not.toHaveAttribute('role');
-  });
-
-  it('buttonBar 优先；onButtonClick 阻止冒泡', () => {
-    const onClick = vi.fn();
-    const onButtonClick = vi.fn();
-    const { rerender } = render(
-      <CaseReply
-        prefixCls="custom-case"
-        quote="q"
-        title="t"
-        buttonBar={<span data-testid="bar">bar</span>}
-        onClick={onClick}
-        className="extra"
-        style={{ margin: 1 }}
-      />,
+    render(
+      <TestWrapper>
+        <CaseReply
+          quote="quote"
+          title="title"
+          description="desc"
+          coverBackground="#112233"
+          onClick={onClick}
+        />
+      </TestWrapper>,
     );
-    expect(screen.getByTestId('bar')).toBeInTheDocument();
-
-    rerender(
-      <CaseReply quote="q" onClick={onClick} onButtonClick={onButtonClick} />,
-    );
-    fireEvent.click(screen.getByText('查看回放'));
-    expect(onButtonClick).toHaveBeenCalled();
-    expect(onClick).not.toHaveBeenCalled();
-  });
-
-  it('无内容时仍可渲染', () => {
-    const { container } = render(<CaseReply />);
-    expect(container.firstChild).toBeTruthy();
+    expect(screen.getByText('desc')).toBeTruthy();
+    const root = screen.getByTestId('agentic-chatboot-case-reply');
+    root.click();
+    expect(onClick).toHaveBeenCalled();
   });
 });

@@ -141,4 +141,35 @@ describe('getTableColWidths 分支覆盖', () => {
     });
     expect(widths).toHaveLength(2);
   });
+
+  it('非 table 节点仍按列数均分；无 children / 非 cell 子节点', () => {
+    expect(
+      getReadonlyTableColWidths({
+        columnCount: 2,
+        element: { type: 'paragraph', children: [{ text: 'x' }] } as any,
+      }),
+    ).toEqual(['50.00%', '50.00%']);
+    expect(
+      getReadonlyTableColWidths({
+        columnCount: 2,
+        element: { type: 'table' } as any,
+      }),
+    ).toHaveLength(2);
+    const widths = getReadonlyTableColWidths({
+      columnCount: 2,
+      element: {
+        type: 'table',
+        children: [
+          {
+            type: 'table-row',
+            children: [
+              { type: 'paragraph', children: [{ text: 'not-cell' }] },
+              null,
+            ],
+          },
+        ],
+      } as any,
+    });
+    expect(widths).toHaveLength(2);
+  });
 });

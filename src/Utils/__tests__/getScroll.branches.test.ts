@@ -77,4 +77,24 @@ describe('getScroll 分支覆盖', () => {
   it('getScrollRailHeight 其它 target 返回 0', () => {
     expect(getScrollRailHeight({} as any)).toBe(0);
   });
+
+  it('getScrollRailHeight Document', () => {
+    const h = getScrollRailHeight(document);
+    expect(typeof h).toBe('number');
+    expect(h).toBeGreaterThanOrEqual(0);
+  });
+
+  it('isWindow false / null target', () => {
+    expect(isWindow(null)).toBe(false);
+    expect(isWindow({} as any)).toBe(false);
+    expect(getScroll(null)).toBe(0);
+  });
+
+  it('非 number scrollTop 且无 ownerDocument 时回退 target.documentElement', () => {
+    const fake = {
+      scrollTop: undefined,
+      documentElement: { scrollTop: 7 },
+    } as any;
+    expect(getScroll(fake)).toBe(7);
+  });
 });

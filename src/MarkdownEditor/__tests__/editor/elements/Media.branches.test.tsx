@@ -1083,4 +1083,45 @@ describe('Media targeted coverage', () => {
     ).toBeInTheDocument();
     warn.mockRestore();
   });
+
+  it('istanbul residual：image showAsText 无 alt/url 默认文案；attachment 无 alt', () => {
+    mocks.getMediaTypeMock.mockReturnValue('image');
+    render(
+      <Media
+        element={{
+          ...baseElement,
+          url: '',
+          alt: '',
+          mediaType: 'image',
+          finished: false,
+        }}
+        attributes={{} as any}
+      >
+        {null}
+      </Media>,
+    );
+    act(() => {
+      vi.advanceTimersByTime(5001);
+    });
+    expect(screen.getByText('图片链接')).toBeInTheDocument();
+  });
+
+  it('istanbul residual：attachment alt 缺省与 comment 空 values', () => {
+    mocks.getMediaTypeMock.mockReturnValue('attachment' as any);
+    render(
+      <Media
+        element={{
+          ...baseElement,
+          url: 'https://example.com/f.bin',
+          alt: undefined,
+          mediaType: 'attachment',
+          comment: [{ id: 'c1' }],
+        } as any}
+        attributes={{} as any}
+      >
+        {null}
+      </Media>,
+    );
+    expect(screen.getByText(/attachment|f\.bin|example\.com/i)).toBeInTheDocument();
+  });
 });

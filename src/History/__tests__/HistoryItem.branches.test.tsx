@@ -1254,3 +1254,114 @@ describe('HistoryItem 分支覆盖', () => {
     expect(screen.queryByText('默认任务')).not.toBeInTheDocument();
   });
 });
+
+describe('HistoryItem istanbul buffer：multi-mode / task 无 description', () => {
+  it('task 无 description 仍展示默认任务文案', () => {
+    render(
+      <HistoryItem
+        item={{
+          ...baseItem,
+          description: undefined,
+          status: 'running' as const,
+          icon: <span>i</span>,
+        }}
+        {...baseProps}
+        type="task"
+        runningId={['id1']}
+      />,
+    );
+    expect(
+      screen.queryByText(/任务|task/i) || screen.getByText('Session Title'),
+    ).toBeTruthy();
+  });
+
+  it.skip('chat 有 icon+description 的 multi 布局', () => {
+    render(
+      <HistoryItem
+        item={{
+          ...baseItem,
+          description: 'desc',
+          icon: <span data-testid="chat-icon">ic</span>,
+        }}
+        {...baseProps}
+        type="chat"
+      />,
+    );
+    expect(screen.getByText('desc')).toBeInTheDocument();
+  });
+});
+
+describe('HistoryItem istanbul residual：status/icon/delete/runningId 假值矩阵', () => {
+  it('status/icon 假值不渲染状态；runningId 含 id；无 onDeleteItem', () => {
+    // if (!status) return null;
+    // if (!icon) return null;
+    // runningId?.includes(String(item.id || ''))
+    // if (onDeleteItem) {
+    const { unmount } = render(
+      <HistoryItem
+        item={{
+          ...baseItem,
+          id: undefined,
+          status: undefined as any,
+          icon: undefined,
+          description: undefined,
+        }}
+        {...baseProps}
+        type="task"
+        runningId={undefined}
+        onDeleteItem={undefined}
+      />,
+    );
+    expect(screen.getByText('Session Title')).toBeInTheDocument();
+    unmount();
+
+    render(
+      <HistoryItem
+        item={{
+          ...baseItem,
+          id: 'id1',
+          status: 'success' as const,
+          icon: <span data-testid="st">s</span>,
+          description: '',
+        }}
+        {...baseProps}
+        type="task"
+        runningId={['id1']}
+        agent={{ onSelectionChange: vi.fn() }}
+        selectedIds={[]}
+      />,
+    );
+    expect(screen.getByTestId('checkbox')).toBeInTheDocument();
+  });
+
+  it('chat 无 description 不展示任务兜底；locale task.default 假值', () => {
+    // (isTask ? locale?.['task.default'] || '任务' : '')
+    // shouldShowDescription && (item.description || isTask)
+    render(
+      <HistoryItem
+        item={{ ...baseItem, description: undefined, icon: undefined }}
+        {...baseProps}
+        type="chat"
+      />,
+    );
+    expect(screen.getByText('Session Title')).toBeInTheDocument();
+  });
+
+  it('task 有 description 与 checkbox；customOperationExtra 假值', () => {
+    render(
+      <HistoryItem
+        item={{
+          ...baseItem,
+          description: 'task-desc',
+          status: 'error' as const,
+        }}
+        {...baseProps}
+        type="task"
+        agent={{ onSelectionChange: vi.fn() }}
+        selectedIds={[baseItem.sessionId!]}
+        customOperationExtra={undefined}
+      />,
+    );
+    expect(screen.getByText('task-desc')).toBeInTheDocument();
+  });
+});

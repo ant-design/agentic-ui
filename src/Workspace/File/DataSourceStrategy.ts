@@ -113,7 +113,8 @@ export class UrlDataSourceStrategy implements DataSourceStrategy {
   }
 
   private getFileCategory(file: FileNode): FileCategory {
-    const extension = file.url?.split('.').pop()?.toLowerCase();
+    // Caller (`process`) already requires `file.url`.
+    const extension = file.url!.split('.').pop()?.toLowerCase();
     if (!extension) return FileCategory.Other;
 
     // 根据扩展名判断分类
@@ -136,7 +137,8 @@ export class UrlDataSourceStrategy implements DataSourceStrategy {
   }
 
   private inferMimeType(file: FileNode): string {
-    const extension = file.url?.split('.').pop()?.toLowerCase();
+    // Caller (`process`) already requires `file.url`.
+    const extension = file.url!.split('.').pop()?.toLowerCase();
     if (!extension) return DEFAULT_MIME_TYPE;
 
     for (const [, definition] of Object.entries(FILE_TYPES)) {

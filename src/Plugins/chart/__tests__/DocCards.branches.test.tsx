@@ -115,4 +115,33 @@ describe('DocCards 分支覆盖', () => {
     );
     expect(screen.getByText('Only')).toBeInTheDocument();
   });
+
+  it('空 data；自定义 title', () => {
+    render(
+      <ConfigProvider>
+        <I18nContext.Provider value={{ locale: {}, language: 'zh-CN' }}>
+          <DocCards title="Docs" columns={cols} data={[]} />
+        </I18nContext.Provider>
+      </ConfigProvider>,
+    );
+    expect(screen.getByText('Docs')).toBeTruthy();
+    expect(screen.getByTestId('doc-cards-header')).toBeTruthy();
+  });
+
+  it('单列 cardColumns=1 网格', () => {
+    const { container } = render(
+      <ConfigProvider>
+        <I18nContext.Provider value={{ locale: {}, language: 'zh-CN' }}>
+          <DocCards
+            cardColumns={1}
+            columns={cols}
+            data={[{ title: 'One', url: '#1' }]}
+          />
+        </I18nContext.Provider>
+      </ConfigProvider>,
+    );
+    expect(screen.getByText('One')).toBeInTheDocument();
+    const grid = container.querySelector('[style*="grid-template-columns"]');
+    expect(grid?.getAttribute('style') || '').toMatch(/repeat\(1/);
+  });
 });

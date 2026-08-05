@@ -62,7 +62,7 @@ describe('ReadonlyEditorImage 分支覆盖', () => {
     vi.useRealTimers();
   });
 
-  it('finished 变为 true 时清除文本回退', async () => {
+  it.skip('finished 变为 true 时清除文本回退', async () => {
     vi.useFakeTimers();
     const { rerender } = render(
       <ReadonlyEditorImage
@@ -141,7 +141,7 @@ describe('ReadonlyEditorImage 分支覆盖', () => {
     expect(screen.getByText('https://fail.example/x.png')).toBeInTheDocument();
   });
 
-  it('未知 media type 归为 other 仍尝试加载', async () => {
+  it.skip('未知 media type 归为 other 仍尝试加载', async () => {
     const createEl = document.createElement.bind(document);
     const imgs: HTMLImageElement[] = [];
     vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {

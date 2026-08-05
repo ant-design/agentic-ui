@@ -56,6 +56,23 @@ describe('adaptiveTooltip branches', () => {
     );
   });
 
+  it('ontouchstart 存在且 maxTouchPoints 非数字时仍判触摸', () => {
+    vi.stubGlobal('window', { innerWidth: 1200, ontouchstart: null });
+    vi.stubGlobal('navigator', {
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0)',
+      maxTouchPoints: 'x' as any,
+    });
+    expect(getAdaptiveTooltipProps('informational')).toEqual(
+      INFORMATIONAL_TOOLTIP_TRIGGER_PROPS,
+    );
+    expect(getAdaptiveTooltipProps()).toEqual(
+      INFORMATIONAL_TOOLTIP_TRIGGER_PROPS,
+    );
+    expect(getAdaptiveTooltipProps('interactive')).toEqual(
+      EMPTY_TOOLTIP_TRIGGER_PROPS,
+    );
+  });
+
   it('server snapshot 恒为 false / 空 trigger', () => {
     expect(getAdaptiveEnvironmentServerSnapshot()).toBe(false);
     expect(getAdaptiveTooltipTriggerPropsServerSnapshot('informational')).toEqual(

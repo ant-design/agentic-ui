@@ -46,16 +46,22 @@ describe('ContentThrottle 分支补洞', () => {
     t.dispose();
   });
 
-  it('displayedLength>=content.length 时 push 直接 flush', () => {
+  it('缩短内容且 displayedLength 已覆盖时直接 flush；同内容追上为 no-op', () => {
     const flushed: string[] = [];
     const t = new ContentThrottle((s) => flushed.push(s), {
       charsPerFrame: 100,
     });
+    t.push('x');
+    flushed.length = 0;
+    // displayedLength 仍为 0，压入空串命中 length 追上 flush
+    t.push('');
+    expect(flushed).toEqual(['']);
+    flushed.length = 0;
     t.push('hi');
     vi.advanceTimersByTime(16);
     flushed.length = 0;
     t.push('hi');
-    expect(flushed).toEqual(['hi']);
+    expect(flushed).toEqual([]);
     t.dispose();
   });
 
@@ -120,6 +126,33 @@ describe('ContentThrottle 分支补洞', () => {
     t.push('abcd');
     vi.advanceTimersByTime(16);
     expect(flushed.at(-1)).toMatch(/^ab/);
+    t.dispose();
+  });
+
+  it('flushOnComplete false 时 complete 不一次性刷完', () => {
+    const flushed: string[] = [];
+    const t = new ContentThrottle((s) => flushed.push(s), {
+      charsPerFrame: 1,
+      flushOnComplete: false,
+    });
+    t.push('abcdef');
+    t.complete();
+    vi.advanceTimersByTime(16);
+    const last = flushed.at(-1) ?? '';
+    expect(last.length).toBeLessThanOrEqual(6);
+    t.dispose();
+  });
+
+  it('非前缀改写重置进度', () => {
+    const flushed: string[] = [];
+    const t = new ContentThrottle((s) => flushed.push(s), {
+      charsPerFrame: 2,
+    });
+    t.push('hello');
+    vi.advanceTimersByTime(16);
+    t.push('world');
+    vi.advanceTimersByTime(16);
+    expect(flushed.join('')).toContain('w');
     t.dispose();
   });
 });

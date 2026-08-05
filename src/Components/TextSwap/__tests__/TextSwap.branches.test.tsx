@@ -77,4 +77,16 @@ describe('TextSwap branches', () => {
       renderSwap(<TextSwap swapKey="1">A</TextSwap>),
     ).not.toThrow();
   });
+
+  it('swapKey 变化触发交换动画 class', () => {
+    const { rerender } = renderSwap(
+      <TextSwap swapKey="a">One</TextSwap>,
+    );
+    rerender(
+      <TextSwap swapKey="b" durationMs={120}>
+        Two
+      </TextSwap>,
+    );
+    expect(screen.getByTestId('text-swap').textContent).toContain('Two');
+  });
 });

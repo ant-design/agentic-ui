@@ -66,6 +66,15 @@ describe('FncRefForMarkdown branches', () => {
       ).toBeUndefined();
     });
 
+    it('children 为 null / false 时无法解析 identifier', () => {
+      expect(
+        extractFootnoteRefFromSupChildren([<a key="1">{null}</a>]),
+      ).toBeUndefined();
+      expect(
+        extractFootnoteRefFromSupChildren([<a key="1">{false}</a>]),
+      ).toBeUndefined();
+    });
+
     it('嵌套 children / 数字 / 空 children 文本提取', () => {
       expect(
         extractFootnoteRefFromSupChildren([

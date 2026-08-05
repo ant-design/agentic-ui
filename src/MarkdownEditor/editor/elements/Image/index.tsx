@@ -134,7 +134,7 @@ export const ResizeImage = ({
     imgRef.current?.style.setProperty('width', `${size.width}px`);
     imgRef.current?.style.setProperty(
       'height',
-      `${(size.width || 0) / radio.current}px`,
+      `${size.width / radio.current}px`,
     );
   }, 160);
 
@@ -210,13 +210,13 @@ export const ResizeImage = ({
           imgRef.current?.style.setProperty('width', `${ele.clientWidth}px`);
           imgRef.current?.style.setProperty(
             'height',
-            `${(ele.clientWidth || 0) / radio.current}px`,
+            `${ele.clientWidth / radio.current}px`,
           );
 
           resize.cancel();
           resize.run({
             width: ele.clientWidth,
-            height: (ele.clientWidth || 0) / radio.current,
+            height: ele.clientWidth / radio.current,
           });
         }}
       >
@@ -285,7 +285,7 @@ export function EditorImage({
     type: getMediaType(element?.url, element.alt),
   });
   const updateElement = useRefFunction((attr: Record<string, any>) => {
-    if (!markdownEditorRef?.current) return;
+    if (!markdownEditorRef.current) return;
     Transforms.setNodes(markdownEditorRef.current, attr, { at: path });
   });
 
@@ -398,7 +398,7 @@ export function EditorImage({
           setState({ selected: true });
         }}
         onResizeStop={(size) => {
-          if (!markdownEditorRef?.current) return;
+          if (!markdownEditorRef.current) return;
           Transforms.setNodes(markdownEditorRef.current, size, {
             at: path,
           });
@@ -465,7 +465,7 @@ export function EditorImage({
                   title: locale?.deleteMedia || '删除媒体',
                   content: locale?.confirmDelete || '确定删除该媒体吗？',
                   onOk: () => {
-                    if (!markdownEditorRef?.current) return;
+                    if (!markdownEditorRef.current) return;
                     Transforms.removeNodes(markdownEditorRef.current, {
                       at: path,
                     });
@@ -479,7 +479,7 @@ export function EditorImage({
               title={element?.block ? locale?.blockImage : locale?.inlineImage}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!markdownEditorRef?.current) return;
+                if (!markdownEditorRef.current) return;
                 Transforms.setNodes(
                   markdownEditorRef.current,
                   {

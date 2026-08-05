@@ -410,3 +410,76 @@ describe('Image targeted coverage', () => {
     createSpy.mockRestore();
   });
 });
+
+describe('Image istanbul residual：alt/src/defaultSize 假值臂', () => {
+  afterEach(() => {
+    resetFakeTimers();
+    storeState.markdownEditorRef = { current: {} };
+    storeState.editorProps = {};
+  });
+
+  it('ReadonlyImage 无 alt 用 image；onError 无 alt/src 用图片链接', () => {
+    const { rerender } = render(
+      <ReadonlyImage src="https://example.com/a.png" />,
+    );
+    expect(screen.getByRole('img')).toHaveAttribute('alt', 'image');
+
+    rerender(<ReadonlyImage src="" alt="" />);
+    fireEvent.error(screen.getByRole('img'));
+    expect(screen.getByTestId('media-error-link')).toHaveTextContent('图片链接');
+  });
+
+  it('ReadonlyImage onError 有 src 无 alt 显示 src', () => {
+    render(<ReadonlyImage src="https://cdn.ex/fail.png" alt="" />);
+    fireEvent.error(screen.getByRole('img'));
+    expect(screen.getByTestId('media-error-link')).toHaveTextContent(
+      'https://cdn.ex/fail.png',
+    );
+  });
+
+  it('ReadonlyImage width 非数字字符串保留原值；数字串转 Number', () => {
+    const { rerender } = render(
+      <ReadonlyImage src="https://x.png" width={'ab' as any} />,
+    );
+    expect(screen.getByRole('img')).toHaveAttribute('width', 'ab');
+    rerender(<ReadonlyImage src="https://x.png" width={'320' as any} />);
+    expect(screen.getByRole('img')).toHaveAttribute('width', '320');
+  });
+
+  it('ResizeImage defaultSize 缺省宽高走 ||400 / ||0', () => {
+    render(<ResizeImage src="https://x.png" alt="" />);
+    expect(screen.getByTestId('resize-image-container')).toBeInTheDocument();
+  });
+
+  it('ResizeImage defaultSize.height 假值；Rnd default 缺省 100%', () => {
+    render(
+      <ResizeImage
+        src="https://x.png"
+        alt="a"
+        defaultSize={{ width: undefined, height: undefined }}
+      />,
+    );
+    expect(screen.getByTestId('rnd')).toBeInTheDocument();
+  });
+
+  it('ResizeImage 加载失败无 alt 用 src 或图片链接', () => {
+    const { rerender } = render(
+      <ResizeImage src="https://fail.png" alt="" />,
+    );
+    const img = document.querySelector('img');
+    expect(img).toBeTruthy();
+    fireEvent.error(img!);
+    expect(screen.getByTestId('media-error-link')).toHaveTextContent(
+      'https://fail.png',
+    );
+
+    rerender(<ResizeImage src="" alt="" />);
+    const img2 = document.querySelector('img');
+    if (img2) {
+      fireEvent.error(img2);
+      expect(screen.getByTestId('media-error-link')).toHaveTextContent(
+        '图片链接',
+      );
+    }
+  });
+});

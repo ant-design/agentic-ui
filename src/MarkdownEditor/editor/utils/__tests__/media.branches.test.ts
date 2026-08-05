@@ -33,4 +33,11 @@ describe('media getRemoteMediaType 分支覆盖', () => {
     expect(await getRemoteMediaType('https://a.com/unknown2')).toBeNull();
     vi.unstubAllGlobals();
   });
+
+  it('data url 无 mime 返回 other；fetch 抛错返回 null', async () => {
+    expect(await getRemoteMediaType('data:;base64,abc')).toBe('other');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
+    expect(await getRemoteMediaType('https://a.com/noext')).toBeNull();
+    vi.unstubAllGlobals();
+  });
 });

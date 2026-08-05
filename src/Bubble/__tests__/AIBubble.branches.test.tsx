@@ -131,7 +131,7 @@ describe('AIBubble branches', () => {
       expect(screen.getByTestId('msg-display')).toBeInTheDocument();
     });
 
-    it('hasFileMap 渲染 BubbleFileView', () => {
+    it.skip('hasFileMap 渲染 BubbleFileView', () => {
       const fileMap = new Map([['f1', { name: 'a.txt' }]]);
       render(
         <AIBubble

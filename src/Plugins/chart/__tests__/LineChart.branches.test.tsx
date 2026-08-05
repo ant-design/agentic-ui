@@ -204,4 +204,11 @@ describe('LineChart 分支覆盖', () => {
     render(<LineChart data={data} />);
     expect(screen.queryByTestId('line-stat')).not.toBeInTheDocument();
   });
+
+  it('renderFilterInToolbar + light theme + empty titles', () => {
+    render(
+      <LineChart data={data} title="" theme="light" renderFilterInToolbar />,
+    );
+    expect(screen.getByTestId('line-chart')).toBeInTheDocument();
+  });
 });

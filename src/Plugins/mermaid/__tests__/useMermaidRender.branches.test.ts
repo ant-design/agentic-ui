@@ -106,4 +106,19 @@ describe('useMermaidRender 分支覆盖', () => {
     rerender({ token: { colorPrimary: '#222' } as any });
     await waitFor(() => expect(divRef.current?.innerHTML).toContain('svg'));
   });
+
+  it('相同 signature 跳过；仅空白 code；结尾 ``` 修剪', async () => {
+    const div = document.createElement('div');
+    const divRef = { current: div };
+    const { rerender } = renderHook(
+      ({ code }) => useMermaidRender(code, divRef, 'm8', true),
+      { initialProps: { code: 'graph TD\nA-->B' } },
+    );
+    await waitFor(() => expect(div.innerHTML).toContain('svg'));
+    rerender({ code: 'graph TD\nA-->B' });
+    rerender({ code: '   ' });
+    await waitFor(() => expect(div.innerHTML).toBe(''));
+    rerender({ code: 'graph TD\nA-->B\n```' });
+    await waitFor(() => expect(div.innerHTML).toContain('svg'));
+  });
 });

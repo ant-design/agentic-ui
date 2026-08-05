@@ -53,6 +53,22 @@ describe('normalizeListChildren 分支覆盖', () => {
     ).toBe(true);
   });
 
+  it('istanbul one-miss: 非空 text 子节点触发 wrapNodes', () => {
+    const editor = createEditor();
+    editor.children = [
+      {
+        type: ListType.ORDERED,
+        children: [{ text: 'pasted item' }],
+      },
+    ] as any;
+    expect(
+      normalizeListChildren(editor, agenticListsSchema, [
+        editor.children[0],
+        [0],
+      ]),
+    ).toBe(true);
+  });
+
   it('非空 text / paragraph / nested list / 其它节点包装', () => {
     const text = createEditor();
     text.children = [
@@ -138,5 +154,41 @@ describe('normalizeListChildren 分支覆盖', () => {
         [0],
       ]),
     ).toBe(false);
+  });
+});
+
+describe('normalizeListChildren istanbul residual：text 子节点 / 非 list', () => {
+  it('非 list 节点返回 false；空白 text 多子节点删除', () => {
+    // if (!schema.isListNode(node)) return false;
+    // if (Text.isText(childNode))
+    const editor = createEditor();
+    editor.children = [
+      { type: 'paragraph', children: [{ text: 'p' }] },
+    ] as any;
+    expect(
+      normalizeListChildren(editor, agenticListsSchema, [
+        editor.children[0],
+        [0],
+      ]),
+    ).toBe(false);
+
+    editor.children = [
+      {
+        type: ListType.UNORDERED,
+        children: [
+          { text: '   ' },
+          {
+            type: 'list-item',
+            children: [{ type: 'paragraph', children: [{ text: 'x' }] }],
+          },
+        ],
+      },
+    ] as any;
+    expect(
+      normalizeListChildren(editor, agenticListsSchema, [
+        editor.children[0],
+        [0],
+      ]),
+    ).toBe(true);
   });
 });

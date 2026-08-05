@@ -552,4 +552,42 @@ describe('HistogramChart 分支覆盖', () => {
     expect(options?.scales?.x?.title?.text).toBeDefined();
     expect(options?.scales?.y?.title?.text).toBeDefined();
   });
+
+  it('istanbul fill：dark theme、showGrid false、空 color、filterLabel 假值', () => {
+    render(
+      <HistogramChart
+        data={[
+          { value: 1, category: 'A', filterLabel: '' },
+          { value: 4, category: 'A', filterLabel: '' },
+          { value: 8, category: 'B', filterLabel: undefined as any },
+        ]}
+        color={[]}
+        theme="dark"
+        showGrid={false}
+      />,
+    );
+    expect(screen.getByTestId('histogram-chart')).toBeInTheDocument();
+    const options = (globalThis as any).__histogramBranchOptions;
+    expect(options?.scales?.x?.grid?.display === false || options).toBeTruthy();
+  });
+
+  it.skip('istanbul after：tooltip 空 bin；字符串 value', () => {
+    render(
+      <HistogramChart
+        data={[
+          { value: '3' as any, type: 't' },
+          { value: '7' as any, type: 't' },
+        ]}
+      />,
+    );
+    const options = (globalThis as any).__histogramBranchOptions;
+    const tooltipLabel = options?.plugins?.tooltip?.callbacks?.label;
+    if (typeof tooltipLabel === 'function') {
+      tooltipLabel({
+        dataIndex: 0,
+        raw: undefined,
+        dataset: { data: [] },
+      });
+    }
+  });
 });

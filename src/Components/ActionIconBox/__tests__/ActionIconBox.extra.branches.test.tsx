@@ -17,6 +17,15 @@ describe('ActionIconBox extra branches', () => {
     expect(screen.getByTestId('aib')).not.toHaveAttribute('aria-label');
   });
 
+  it('非 element 子节点 + iconStyle 时原样返回', () => {
+    render(
+      <ActionIconBox title="t" iconStyle={{ color: 'red' }} data-testid="aib">
+        text
+      </ActionIconBox>,
+    );
+    expect(screen.getByTestId('aib')).toHaveTextContent('text');
+  });
+
   it('children 为函数时按 hover 渲染', () => {
     render(
       <ActionIconBox title="t" data-testid="aib-fn">

@@ -115,4 +115,35 @@ describe('CodeToolbar 分支覆盖', () => {
     expect(buttons.length).toBeGreaterThan(0);
     fireEvent.click(buttons[0]);
   });
+
+  it('危险 HTML 模式串：on*/javascript:/eval/Function/setTimeout', () => {
+    const cases = [
+      '<div onclick="x()">',
+      '<a href="javascript:alert(1)">',
+      'eval("x")',
+      'Function("return 1")()',
+      'setTimeout("x", 1)',
+    ];
+    for (const value of cases) {
+      const { unmount } = render(
+        <CodeToolbar
+          theme="dark"
+          isExpanded={false}
+          element={
+            {
+              type: 'code',
+              language: 'html',
+              value,
+              children: [{ text: '' }],
+            } as any
+          }
+          readonly={false}
+          onCloseClick={vi.fn()}
+          languageSelectorProps={langProps}
+        />,
+      );
+      expect(screen.getByTestId('code-toolbar')).toBeInTheDocument();
+      unmount();
+    }
+  });
 });

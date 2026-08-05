@@ -258,5 +258,35 @@ describe('htmlUrlSafety branches', () => {
         }),
       ).toBe(true);
     });
+
+    it('serializeHastElement：数组属性、空属性、嵌套 element/text、非 void', () => {
+      expect(
+        serializeHastElement({
+          tagName: 'div',
+          properties: { className: ['a', 'b'] as unknown as string },
+          children: [
+            { type: 'text', value: 'hi' },
+            { type: 'element', tagName: 'span', children: [{ type: 'text', value: 'x' }] },
+            { type: 'comment' as any },
+          ],
+        }),
+      ).toContain('className="a b"');
+      expect(
+        serializeHastElement({
+          tagName: 'br',
+          properties: {},
+        }),
+      ).toBe('<br>');
+      expect(
+        serializeHastElement({
+          tagName: 'p',
+        }),
+      ).toBe('<p></p>');
+    });
+
+    it('shouldRenderUrlAsPlainText：HTML 片段', () => {
+      expect(shouldRenderUrlAsPlainText('<img src=x onerror=1>')).toBe(true);
+      expect(shouldRenderUrlAsPlainText('   ')).toBe(false);
+    });
   });
 });

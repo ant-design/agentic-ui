@@ -679,4 +679,26 @@ describe('BoxPlotChart 分支覆盖', () => {
     const data = (globalThis as any).__boxplotBranchData;
     expect(data?.datasets?.length).toBeGreaterThan(0);
   });
+
+  it('istanbul residual-extra：空数据；tooltip raw 缺失；theme dark', () => {
+    const { unmount } = render(<BoxPlotChart data={[]} theme="dark" />);
+    expect(screen.queryByTestId('boxplot-chart') || document.body).toBeTruthy();
+    unmount();
+
+    render(
+      <BoxPlotChart
+        data={[{ label: 'G', type: 't', values: [1, 2, 3, 4, 5] }]}
+        theme="dark"
+      />,
+    );
+    const options = (globalThis as any).__boxplotBranchOptions;
+    const tooltipLabel = options?.plugins?.tooltip?.callbacks?.label;
+    if (typeof tooltipLabel === 'function') {
+      tooltipLabel({ raw: undefined, dataIndex: 0 });
+      tooltipLabel({
+        raw: { min: 1, q1: 2, median: 3, q3: 4, max: 5 },
+        dataIndex: 0,
+      });
+    }
+  });
 });

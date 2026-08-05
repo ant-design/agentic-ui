@@ -392,4 +392,14 @@ describe('applyReadonlyCommentHighlights 分支覆盖', () => {
     expect(findSpy.mock.calls.length).toBe(1);
     findSpy.mockRestore();
   });
+
+  it('空 searchText / 无匹配时不插入 mark', () => {
+    const root = makeRoot('<div data-be="paragraph">nothing here</div>');
+    applyReadonlyCommentHighlights(
+      root,
+      [{ id: 'e', content: 'c', refContent: '' }] as any,
+      PREFIX,
+    );
+    expect(root.querySelector('mark')).toBeNull();
+  });
 });

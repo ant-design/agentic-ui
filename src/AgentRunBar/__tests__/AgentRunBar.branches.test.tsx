@@ -153,4 +153,16 @@ describe('AgentRunBar 分支补充', () => {
     );
     expect(screen.getByLabelText('继续')).toBeInTheDocument();
   });
+
+  it('RUNNING 态展示停止；缺省 locale 回退', () => {
+    wrap(
+      <AgentRunBar
+        taskStatus={TASK_STATUS.RUNNING}
+        taskRunningStatus={TASK_RUNNING_STATUS.RUNNING}
+        onStop={vi.fn()}
+        onPause={vi.fn()}
+      />,
+    );
+    expect(screen.getAllByLabelText('停止').length).toBeGreaterThan(0);
+  });
 });

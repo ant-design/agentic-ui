@@ -11,6 +11,11 @@ describe('markdownToReactSync 分支覆盖', () => {
     expect(markdownToReactSync('')).toBeNull();
   });
 
+  it('null / undefined content 返回 null', () => {
+    expect(markdownToReactSync(null as any)).toBeNull();
+    expect(markdownToReactSync(undefined as any)).toBeNull();
+  });
+
   it('解析简单 markdown 返回 React 节点', () => {
     const result = markdownToReactSync('**bold text**');
     expect(result).toBeTruthy();

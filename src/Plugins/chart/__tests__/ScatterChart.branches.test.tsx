@@ -1200,5 +1200,41 @@ describe('ScatterChart 分支覆盖', () => {
         ]),
       );
     });
+
+    it('istanbul residual-extra：空 item 跳过；color 假值；tooltip datasetIndex', () => {
+      render(
+        <ScatterChart
+          data={[
+            null as any,
+            { category: 'A', type: 'T1', x: 1, y: 2 },
+            { category: 'A', type: 'T1', x: 3, y: 4 },
+          ]}
+          color={['', undefined as any]}
+          theme="dark"
+        />,
+      );
+      const ds = capturedScatterProps?.data?.datasets?.[0];
+      expect(ds?.data?.length).toBeGreaterThan(0);
+
+      const tooltipExt =
+        capturedScatterProps?.options?.plugins?.tooltip?.external;
+      if (typeof tooltipExt === 'function') {
+        tooltipExt({
+          tooltip: {
+            opacity: 1,
+            dataPoints: [
+              {
+                dataIndex: 0,
+                datasetIndex: undefined,
+                raw: { x: 1, y: 2 },
+              },
+            ],
+            caretX: 1,
+            caretY: 2,
+          },
+          chart: { canvas: document.createElement('canvas') },
+        });
+      }
+    });
   });
 });

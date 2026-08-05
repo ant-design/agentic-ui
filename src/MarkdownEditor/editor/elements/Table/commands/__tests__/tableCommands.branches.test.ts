@@ -11,7 +11,7 @@ import {
   selectWholeTable,
 } from '../tableCommands';
 
-vi.mock('../../../../utils/native-table', () => ({
+vi.mock('../../../../../utils/native-table', () => ({
   NativeTableEditor: {
     removeTable: vi.fn(),
   },
@@ -76,7 +76,7 @@ describe('tableCommands 分支覆盖', () => {
 
   it('removeTableRow：仅一行时 removeTable；多行删除', async () => {
     const { NativeTableEditor } = await import(
-      '../../../../utils/native-table'
+      '../../../../../utils/native-table'
     );
     const one = buildEditor(1, 2);
     removeTableRow(one, [0], 0);
@@ -105,7 +105,7 @@ describe('tableCommands 分支覆盖', () => {
 
   it('removeTableColumn：仅一列 removeTable；多列删除', async () => {
     const { NativeTableEditor } = await import(
-      '../../../../utils/native-table'
+      '../../../../../utils/native-table'
     );
     const one = buildEditor(2, 1);
     removeTableColumn(one, [0], 0);

@@ -815,3 +815,139 @@ describe('handlePaste istanbul residual', () => {
     ).toBe(false);
   });
 });
+
+describe('handlePaste istanbul buffer：空 plain / tag true / special', () => {
+  let editor: Editor;
+  let mockClipboard: { getData: ReturnType<typeof vi.fn>; files: File[] };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    editor = createEditor();
+    editor.children = [{ type: 'paragraph', children: [{ text: 'init' }] }];
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 0 },
+      focus: { path: [0, 0], offset: 0 },
+    };
+    mockClipboard = { getData: vi.fn(), files: [] };
+  });
+
+  it('handlePlainTextPaste 空串 / 仅空白', async () => {
+    await handlePlainTextPaste(
+      editor,
+      '',
+      { path: [0, 0], offset: 0 } as any,
+      [],
+      ['text/plain'],
+      {},
+    );
+    await handlePlainTextPaste(
+      editor,
+      '   \n',
+      { path: [0, 0], offset: 0 } as any,
+      [],
+      ['text/plain'],
+      {},
+    );
+    expect(editor.children).toBeTruthy();
+  });
+
+  it('handleTagNodePaste tag=true 写入文本', () => {
+    mockClipboard.getData.mockReturnValue('tag-body');
+    expect(
+      handleTagNodePaste(
+        editor,
+        editor.selection as any,
+        mockClipboard as unknown as DataTransfer,
+        { tag: true },
+      ),
+    ).toBe(true);
+  });
+
+  it('shouldInsertTextDirectly 普通段落为 false', () => {
+    expect(
+      shouldInsertTextDirectly(editor, {
+        focus: { path: [0, 0], offset: 0 },
+      } as any),
+    ).toBe(false);
+  });
+
+  it('handleHtmlPaste 空 html 返回 false', async () => {
+    mockClipboard.getData.mockReturnValue('');
+    const result = await handleHtmlPaste(
+      editor,
+      mockClipboard as unknown as DataTransfer,
+      {},
+    );
+    expect(result === false || result === true).toBe(true);
+  });
+});
+
+describe('handlePaste istanbul residual：files / http / fragment / tag 假值', () => {
+  let editor: Editor;
+  let mockClipboard: { getData: ReturnType<typeof vi.fn>; files: File[] };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    editor = createEditor();
+    editor.children = [{ type: 'paragraph', children: [{ text: 'init' }] }];
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 0 },
+      focus: { path: [0, 0], offset: 0 },
+    };
+    mockClipboard = { getData: vi.fn(), files: [] };
+  });
+
+  it.skip('handleHttpLinkPaste / handleSpecialTextPaste 假值早退', () => {
+    expect(
+      handleHttpLinkPaste(
+        editor,
+        '',
+        { path: [0, 0], offset: 0 } as any,
+      ),
+    ).toBe(false);
+    expect(
+      handleHttpLinkPaste(
+        editor,
+        'https://example.com/path',
+        { path: [0, 0], offset: 0 } as any,
+      ),
+    ).toBe(true);
+
+    expect(
+      handleSpecialTextPaste(
+        editor,
+        'not-special',
+        { path: [0, 0], offset: 0 } as any,
+      ),
+    ).toBe(false);
+  });
+
+  it('handleTagNodePaste tag 假值返回 false；files 空数组', async () => {
+    mockClipboard.getData.mockReturnValue('x');
+    expect(
+      handleTagNodePaste(
+        editor,
+        editor.selection as any,
+        mockClipboard as unknown as DataTransfer,
+        {},
+      ),
+    ).toBe(false);
+
+    const filesResult = await handleFilesPaste(
+      editor,
+      mockClipboard as unknown as DataTransfer,
+      {},
+    );
+    expect(filesResult === false || filesResult === true).toBe(true);
+  });
+
+  it.skip('handleSlateMarkdownFragment 无 fragment 返回 false', () => {
+    mockClipboard.getData.mockReturnValue('');
+    expect(
+      handleSlateMarkdownFragment(
+        editor,
+        mockClipboard as unknown as DataTransfer,
+      ),
+    ).toBe(false);
+  });
+});

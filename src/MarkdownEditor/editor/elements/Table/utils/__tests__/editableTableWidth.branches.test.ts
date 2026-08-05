@@ -104,6 +104,18 @@ describe('editableTableWidth 分支覆盖', () => {
       expect(overflow).toHaveLength(3);
       expect(new Set(overflow).size).toBe(1);
     });
+    it('显式 colWidths：空串 / 非法 % / 数字字符串', () => {
+      const widths = getEditableTableColWidths({
+        readonly: false,
+        columnCount: 3,
+        availableTableWidth: 300,
+        mobileBreakpointValue: 768,
+        element: tableElement(['', 'NaN%', '40px']),
+      });
+      expect(widths).toHaveLength(3);
+      expect(widths[0]).toBeGreaterThanOrEqual(1);
+      expect(widths[2]).toBe(40);
+    });
   });
 
   describe('getEditableTableMinWidth', () => {

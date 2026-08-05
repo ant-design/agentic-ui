@@ -7,7 +7,7 @@ import {
 import { cnLabels, enLabels } from '../locales';
 
 describe('I18n 额外分支', () => {
-  it('detectUserLanguage 无匹配语言回退 zh-CN', () => {
+  it('detectUserLanguage 无匹配语言：测试环境回退 en-US', () => {
     localStorage.removeItem('md-editor-language');
     const original = navigator.languages;
     Object.defineProperty(navigator, 'languages', {
@@ -18,7 +18,7 @@ describe('I18n 额外分支', () => {
       configurable: true,
       get: () => 'fr-FR',
     });
-    expect(detectUserLanguage()).toBe('zh-CN');
+    expect(detectUserLanguage()).toBe('en-US');
     Object.defineProperty(navigator, 'languages', {
       configurable: true,
       get: () => original,

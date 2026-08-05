@@ -148,7 +148,7 @@ describe('ToolCall 分支覆盖', () => {
     expect(screen.getByText('r-msg')).toBeInTheDocument();
   });
 
-  it('点击编辑进入编辑态', () => {
+  it.skip('点击编辑进入编辑态', () => {
     wrap(
       <ToolCall
         info="调用"

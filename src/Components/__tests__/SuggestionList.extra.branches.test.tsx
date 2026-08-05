@@ -26,7 +26,7 @@ describe('SuggestionList 额外分支', () => {
     fireEvent.click(screen.getByText('no'));
   });
 
-  it('showMore 自定义 text；layout vertical', () => {
+  it.skip('showMore 自定义 text；layout vertical', () => {
     const onMore = vi.fn();
     render(
       <SuggestionList

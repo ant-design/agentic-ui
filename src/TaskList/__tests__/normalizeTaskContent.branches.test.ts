@@ -46,4 +46,20 @@ describe('normalizeTaskContent 分支覆盖', () => {
     expect(hasNormalizedTaskContent([])).toBe(false);
     expect(hasNormalizedTaskContent([1, 2])).toBe(true);
   });
+
+  it('number/boolean content 与 fallback；空串 content 回退数字 title', () => {
+    expect(normalizeTaskContent(42)).toBe('42');
+    expect(normalizeTaskContent(true)).toBe('true');
+    expect(normalizeTaskContent('   ', 9)).toBe('9');
+    expect(hasNormalizedTaskContent(0)).toBe(true);
+    expect(hasNormalizedTaskContent(false)).toBe(true);
+    expect(hasNormalizedTaskContent('   ')).toBe(false);
+    expect(hasNormalizedTaskContent(null, 'title')).toBe(true);
+  });
+
+  it('数组混合空串与数字；props 无 children 回退', () => {
+    expect(normalizeTaskContent(['', 3, null], 'fb')).toBe('3');
+    expect(normalizeTaskContent({ type: 'div', props: {} }, 'fb')).toBe('fb');
+    expect(normalizeTaskContent({ type: 'div' }, 'fb')).toBe('fb');
+  });
 });

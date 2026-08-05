@@ -1122,3 +1122,124 @@ describe('elements/index istanbul residual', () => {
     expect(screen.getByText('leaf-child')).toBeInTheDocument();
   });
 });
+
+describe('elements/index istanbul buffer：组合 mark 与 void', () => {
+  it('MLeaf bold+code+highColor 组合', () => {
+    render(
+      <MLeaf
+        {...baseLeafProps}
+        leaf={{
+          text: 'combo',
+          bold: true,
+          code: true,
+          highColor: '#0f0',
+          fnc: true,
+        }}
+      />,
+    );
+    expect(screen.getByText('leaf-child')).toBeInTheDocument();
+  });
+
+  it('MLeaf mark 全属性与空 text', () => {
+    render(
+      <MLeaf
+        {...baseLeafProps}
+        leaf={{
+          text: '',
+          mark: true,
+          markColor: '#f00',
+          markBg: '#ff0',
+          markLabel: '@',
+        }}
+      />,
+    );
+    expect(screen.getByText('leaf-child')).toBeInTheDocument();
+  });
+
+  it('MLeaf deepen：html/jinja*/color/current；mark 无 label；code 无 tag', () => {
+    const { unmount: u1 } = render(
+      <MLeaf
+        {...baseLeafProps}
+        leaf={{
+          text: 'html',
+          html: true,
+          color: '#123',
+          current: true,
+          jinjaVariable: true,
+          jinjaTag: true,
+          jinjaComment: true,
+          jinjaKeyword: true,
+          jinjaString: true,
+          jinjaNumber: true,
+          jinjaFilter: true,
+          jinjaVariableName: true,
+          jinjaPlaceholder: true,
+          jinjaDelimiter: true,
+        }}
+      />,
+    );
+    expect(screen.getByText('leaf-child')).toBeInTheDocument();
+    u1();
+
+    const { unmount: u2 } = render(
+      <MLeaf
+        {...baseLeafProps}
+        leaf={{
+          text: 'marked',
+          mark: true,
+          markColor: '#abc',
+        }}
+      />,
+    );
+    expect(screen.getByTestId('markdown-mark')).toBeInTheDocument();
+    u2();
+
+    render(
+      <MLeaf
+        {...baseLeafProps}
+        tagInputProps={{ enable: false }}
+        leaf={{ text: 'code-only', code: true }}
+      />,
+    );
+    expect(screen.getByText('leaf-child')).toBeInTheDocument();
+  });
+
+  it('MLeaf deepen：tag onSelect 有 focusElement 且 Path.next 已存在', async () => {
+    const editor = { focus: vi.fn(), children: [] };
+    const container = document.createElement('div');
+    container.innerHTML = '<div data-slate-node="value"></div>';
+    const focusElement = container.querySelector(
+      'div[data-slate-node="value"]',
+    ) as HTMLDivElement;
+    focusElement.focus = vi.fn();
+    vi.mocked(useEditorStore).mockReturnValue({
+      markdownEditorRef: { current: editor },
+      markdownContainerRef: { current: container },
+    } as any);
+    vi.mocked(Editor.hasPath).mockReturnValue(true);
+    vi.mocked(Path.next).mockReturnValue([0, 1] as any);
+
+    render(
+      <MLeaf
+        {...baseLeafProps}
+        tagInputProps={{
+          enable: true,
+          tagTextRender: () => '',
+        }}
+        leaf={{
+          text: '$',
+          tag: true,
+          code: true,
+          triggerText: '#',
+          placeholder: 'ph',
+          autoOpen: true,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('tag-select-valid'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(Transforms.select).toHaveBeenCalled();
+    expect(focusElement.focus).toHaveBeenCalled();
+  });
+});

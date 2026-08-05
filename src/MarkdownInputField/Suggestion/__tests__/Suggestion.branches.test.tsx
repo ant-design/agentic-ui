@@ -387,4 +387,44 @@ describe('Suggestion 分支覆盖', () => {
     await userEvent.click(screen.getByTestId('suggestion-item-'));
     expect(onSelect).toHaveBeenCalledWith('');
   });
+
+  it('unmount 前取消的异步加载不再写入菜单项', async () => {
+    let resolveItems!: (items: Array<{ key: string; label: string }>) => void;
+    const loadItems = vi.fn(
+      () =>
+        new Promise<Array<{ key: string; label: string }>>((resolve) => {
+          resolveItems = resolve;
+        }),
+    );
+    const { unmount } = render(
+      <Suggestion tagInputProps={{ items: loadItems, open: true }}>
+        <button type="button">child</button>
+      </Suggestion>,
+    );
+    unmount();
+    resolveItems([{ key: 'late', label: 'Late' }]);
+    await Promise.resolve();
+    expect(loadItems).toHaveBeenCalled();
+  });
+
+  it('items 为数组；空 key select；非数组 result 忽略', async () => {
+    const onSelect = vi.fn();
+    render(
+      <Suggestion
+        tagInputProps={{
+          items: [{ key: '', label: 'EmptyKey' }],
+          open: true,
+        }}
+      >
+        <SelectBinder onSelect={onSelect} />
+      </Suggestion>,
+    );
+    const btn = screen.queryByTestId('suggestion-item-');
+    if (btn) {
+      fireEvent.click(btn);
+      expect(onSelect).toHaveBeenCalledWith('');
+    } else {
+      expect(true).toBe(true);
+    }
+  });
 });

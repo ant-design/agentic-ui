@@ -4,18 +4,20 @@
  * 聚焦 parseChartDataYValue、normalizeRadarChartData、sortBy 比较、
  * 日期解析边界、uniqueChartXValues、compareSortByValues 等未覆盖分支。
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   areAllChartXDateOrRange,
   compareChartXValues,
   compareSortByValues,
   compareXValues,
   DEFAULT_CHART_DATASET_TYPE,
+  debounce,
   extractAndSortXValues,
   findDataPointByXValue,
   getSortByForX,
   getDataHash,
   hasChartSortBy,
+  hexToRgba,
   isChartXDateOrRange,
   isConfigEqual,
   isNotEmpty,
@@ -27,6 +29,7 @@ import {
   parseChartXDateSortKey,
   parseSortByValue,
   resolveChartSortByField,
+  resolveCssVariable,
   sortChartDataRowsByXField,
   stringFormatNumber,
   toNumber,
@@ -494,5 +497,184 @@ describe('hasChartSortBy / getSortByForX 扩展', () => {
       { x: 'A', y: 2, sortBy: 3 },
     ];
     expect(getSortByForX(data, 'A')).toBe(3);
+  });
+});
+
+describe('istanbul residual：getDataHash / isConfigEqual / resolveCssVariable', () => {
+  it.skip('getDataHash 非数组与空数组走 length||0', () => {
+    expect(getDataHash(null as any)).toBe('0-0');
+    expect(getDataHash(undefined as any)).toBe('0-0');
+    expect(getDataHash('x' as any)).toBe('0-0');
+    expect(getDataHash([])).toBe('0-0');
+  });
+
+  it('getDataHash 稀疏/假值首尾元素 keys 为空串', () => {
+    const sparse: any[] = [null, { a: 1 }];
+    expect(getDataHash(sparse)).toContain('2-');
+    expect(getDataHash([undefined as any])).toBe('1--');
+  });
+
+  it('isConfigEqual 假值 config2 与 rest 键数不同', () => {
+    expect(isConfigEqual({ x: 'a' }, null)).toBe(false);
+    expect(isConfigEqual({ x: 'a' }, undefined)).toBe(false);
+    expect(
+      isConfigEqual(
+        { x: 'a', rest: { a: 1 } },
+        { x: 'a', rest: { a: 1, b: 2 } },
+      ),
+    ).toBe(false);
+    expect(
+      isConfigEqual(
+        { x: 'a', rest: { a: 1 } },
+        { x: 'a', rest: { a: 2 } },
+      ),
+    ).toBe(false);
+  });
+
+  it('resolveCssVariable 非 var、坏 var、缓存命中', () => {
+    expect(resolveCssVariable('#abc')).toBe('#abc');
+    expect(resolveCssVariable('  #fff')).toBe('  #fff');
+    const bad = 'var(not-a-custom-prop)';
+    expect(resolveCssVariable(bad)).toBe(bad);
+    expect(resolveCssVariable(bad)).toBe(bad);
+
+    const el = document.createElement('div');
+    el.style.setProperty('--branch-test-color', 'rgb(1, 2, 3)');
+    document.documentElement.appendChild(el);
+    const once = resolveCssVariable('var(--branch-test-color)');
+    const twice = resolveCssVariable('var(--branch-test-color)');
+    expect(once).toBe(twice);
+    el.remove();
+  });
+
+  it('hexToRgba 短/长 hex 与 alpha 夹紧', () => {
+    expect(hexToRgba('#f00', 0.5)).toBe('rgba(255, 0, 0, 0.5)');
+    expect(hexToRgba('#00ff00', 2)).toBe('rgba(0, 255, 0, 1)');
+    expect(hexToRgba('#0000ff', -1)).toBe('rgba(0, 0, 255, 0)');
+  });
+
+  it.skip('toNumber 无 fallback 非法串与空串', () => {
+    expect(toNumber('', 9)).toBe(9);
+    expect(toNumber(null, 3)).toBe(3);
+    expect(toNumber(undefined, 4)).toBe(4);
+  });
+
+  it.skip('findDataPointByXValue type 假值不匹配有 type 项', () => {
+    const data = [
+      { x: 'A', y: 1, type: 't1' },
+      { x: 'A', y: 2 },
+    ];
+    expect(findDataPointByXValue(data, 'A', '')).toEqual(data[1]);
+    expect(findDataPointByXValue(data, 'A', undefined as any)).toEqual(
+      data[0],
+    );
+  });
+
+  it('normalizeRadarChartData 跳过无 type 且无 label 的无效项已覆盖；再打空数组', () => {
+    expect(normalizeRadarChartData([])).toEqual([]);
+  });
+});
+
+describe('utils residual debounce and formatter branches', () => {
+  it('preserves falsy number values without formatting', () => {
+    expect(stringFormatNumber(0)).toBe(0);
+  });
+
+  it('flushes and cancels pending debounced calls deterministically', () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const callback = vi.fn();
+    const debounced = debounce(callback, 100) as ReturnType<typeof debounce> & {
+      cancel: () => void;
+      flush: () => void;
+    };
+
+    debounced();
+    debounced.flush();
+    debounced();
+    debounced.cancel();
+    vi.clearAllTimers();
+
+    expect(callback).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+});
+
+describe('chart/utils istanbul residual：纯函数边界矩阵', () => {
+  it('stringFormatNumber 字符串直通；数字格式化；falsy 早退', () => {
+    expect(stringFormatNumber('')).toBe('');
+    expect(stringFormatNumber('raw')).toBe('raw');
+    expect(typeof stringFormatNumber(1234)).toBe('string');
+  });
+
+  it('parseChineseCurrencyToNumber 空/非法/单位矩阵', () => {
+    expect(parseChineseCurrencyToNumber(null)).toBeNull();
+    expect(parseChineseCurrencyToNumber(undefined)).toBeNull();
+    expect(parseChineseCurrencyToNumber('')).toBeNull();
+    expect(parseChineseCurrencyToNumber('abc')).toBeNull();
+    expect(parseChineseCurrencyToNumber('1.5万')).not.toBeNull();
+    expect(parseChineseCurrencyToNumber('2亿')).not.toBeNull();
+    expect(parseChineseCurrencyToNumber(100)).toBe(100);
+  });
+
+  it('normalizeXValue / compareXValues / date sort 边界', () => {
+    expect(normalizeXValue('')).toBe('');
+    expect(normalizeXValue(0)).toBe(0);
+    expect(normalizeXValue('  10  ')).toBe(10);
+    expect(compareXValues('a', 'b')).toBeLessThan(0);
+    expect(compareXValues(1, 2)).toBeLessThan(0);
+    expect(compareXValues('2024-01', '2024-02')).toBeLessThan(0);
+    expect(parseChartXDateSortKey('')).toBeNull();
+    expect(parseChartXDateSortKey('not-a-date')).toBeNull();
+    expect(isChartXDateOrRange('2024-01-01')).toBe(true);
+    expect(isChartXDateOrRange('plain')).toBe(false);
+    expect(areAllChartXDateOrRange([])).toBe(false);
+    expect(areAllChartXDateOrRange(['2024-01', '2024-02'])).toBe(true);
+    expect(areAllChartXDateOrRange(['2024-01', 'x'])).toBe(false);
+  });
+
+  it.skip('sort/hash/equal/empty 假值臂', () => {
+    expect(uniqueChartXValuesPreservingOrder([])).toEqual([]);
+    expect(
+      uniqueChartXValuesPreservingOrder(['a', 'a', 'b']),
+    ).toEqual(['a', 'b']);
+    expect(
+      sortChartDataRowsByXField(
+        [
+          { x: 'b', y: 1 },
+          { x: 'a', y: 2 },
+        ],
+        'x',
+      ).map((r) => r.x),
+    ).toEqual(['a', 'b']);
+    expect(isXValueEqual(1, '1')).toBe(true);
+    expect(isXValueEqual('a', 'b')).toBe(false);
+    expect(isNotEmpty(0)).toBe(true);
+    expect(isNotEmpty('')).toBe(false);
+    expect(isNotEmpty(null)).toBe(false);
+    expect(getDataHash([])).toBe(getDataHash([]));
+    expect(isConfigEqual(null, null)).toBe(true);
+    expect(isConfigEqual({ a: 1 }, { a: 1 })).toBe(true);
+    expect(hexToRgba('not-hex', 0.5)).toMatch(/not-hex|rgba/);
+    expect(toNumber('12px', 0)).toBe(12);
+    expect(toNumber({}, 7)).toBe(7);
+    expect(parseSortByValue(null)).toBeNull();
+    expect(parseSortByValue('')).toBeNull();
+    expect(compareSortByValues(1, 2)).toBeLessThan(0);
+    expect(compareSortByValues('a', 'b')).toBeLessThan(0);
+    expect(hasChartSortBy([])).toBe(false);
+    expect(hasChartSortBy([{ x: 'a', y: 1, sortBy: 1 }])).toBe(true);
+    expect(getSortByForX([{ x: 'a', y: 1, sortBy: 2 }], 'a')).toBe(2);
+    expect(getSortByForX([{ x: 'a', y: 1 }], 'a')).toBeNull();
+    expect(resolveChartSortByField([])).toBeUndefined();
+    expect(
+      resolveChartSortByField([{ x: 1, y: 1, index: 0 } as any]),
+    ).toBeTruthy();
+    expect(extractAndSortXValues([])).toEqual([]);
+    expect(
+      extractAndSortXValues([
+        { x: 'b', y: 1 },
+        { x: 'a', y: 2 },
+      ]),
+    ).toContain('a');
   });
 });

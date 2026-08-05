@@ -960,3 +960,115 @@ describe('FileTreeComponent 分支覆盖', () => {
     expect(screen.getByText('暂无数据')).toBeInTheDocument();
   });
 });
+
+describe('FileTree istanbul buffer：搜索无结果文案 / filterKeyword 假值', () => {
+  it('有 keyword 无匹配时展示 noResults 回退', async () => {
+    render(
+      <ConfigProvider>
+        <I18nContext.Provider value={{ locale: {} as any, language: 'zh-CN' }}>
+          <FileTree
+            treeData={[
+              {
+                key: 'a',
+                name: 'alpha.txt',
+                isLeaf: true,
+                file: { id: 'a', name: 'alpha.txt', canPreview: true },
+              },
+            ]}
+            filterKeyword="zzz-no-match"
+          />
+        </I18nContext.Provider>
+      </ConfigProvider>,
+    );
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/未找到|noResults|zzz/i) ||
+          document.querySelector('.ant-empty') ||
+          document.querySelector('.ant-tree'),
+      ).toBeTruthy();
+    });
+  });
+});
+
+describe('FileTree istanbul residual：filter / select / leaf 假值矩阵', () => {
+  it('空 filterKeyword 返回全量；isLeaf ?? !hasChildren；children ?? []', async () => {
+    // if (!q) return nodes;
+    // const resolvedIsLeaf = node.isLeaf ?? !hasChildren;
+    // return { ...node, children: node.children ?? [] };
+    render(
+      <TestWrapper>
+        <FileTree
+          treeData={[
+            {
+              key: 'dir',
+              name: 'dir',
+              isLeaf: undefined,
+              children: undefined,
+            },
+            {
+              key: 'leaf',
+              name: 'leaf.txt',
+              isLeaf: true,
+              file: {
+                id: 'leaf',
+                name: 'leaf.txt',
+                url: 'https://example.com/l',
+                canPreview: true,
+              },
+            },
+          ]}
+          filterKeyword="  "
+        />
+      </TestWrapper>,
+    );
+    expect(screen.getByText('leaf.txt')).toBeInTheDocument();
+  });
+
+  it('onSelect：未选中早退；disabled；onPreview else', async () => {
+    // if (!info.selected) return;
+    // if (!n) return;
+    // if (!file || n.disabled === true) return;
+    // } else if (onPreview) {
+    const onPreview = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <TestWrapper>
+        <FileTree
+          treeData={[
+            {
+              key: 'd',
+              name: 'disabled.txt',
+              isLeaf: true,
+              disabled: true,
+              file: {
+                id: 'd',
+                name: 'disabled.txt',
+                canPreview: true,
+              },
+            },
+            {
+              key: 'p',
+              name: 'preview.txt',
+              isLeaf: true,
+              file: {
+                id: 'p',
+                name: 'preview.txt',
+                url: 'https://example.com/p',
+                canPreview: true,
+              },
+            },
+          ]}
+          onPreview={onPreview}
+          onSelect={onSelect}
+        />
+      </TestWrapper>,
+    );
+    fireEvent.click(screen.getByText('preview.txt'));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(onPreview.mock.calls.length + onSelect.mock.calls.length).toBeGreaterThan(
+      0,
+    );
+  });
+});

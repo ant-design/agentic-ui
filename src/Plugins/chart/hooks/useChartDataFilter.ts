@@ -60,16 +60,16 @@ export const useChartDataFilter = (data: ChartDataItem[]) => {
 
   // 状态管理
   const [selectedFilter, setSelectedFilter] = useState<string>(
-    categories.find(Boolean) || '',
+    categories[0] || '',
   );
   const [selectedFilterLabel, setSelectedFilterLabel] = useState(
-    filterLabels && filterLabels.length > 0 ? filterLabels[0] : undefined,
+    filterLabels?.[0],
   );
 
   // 当数据变化导致当前选中分类失效时，自动回退到首个有效分类或空（显示全部）
   useEffect(() => {
     if (selectedFilter && !categories.includes(selectedFilter)) {
-      setSelectedFilter(categories.find(Boolean) || '');
+      setSelectedFilter(categories[0] || '');
     }
   }, [categories, selectedFilter]);
 
@@ -115,8 +115,8 @@ export const useChartDataFilter = (data: ChartDataItem[]) => {
   // 筛选器选项
   const filterOptions = useMemo(() => {
     return categories.map((category) => ({
-      label: category || '默认',
-      value: category || '默认',
+      label: category,
+      value: category,
     }));
   }, [categories]);
 

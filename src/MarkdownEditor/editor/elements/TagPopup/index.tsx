@@ -192,8 +192,9 @@ const updateNodeContext = (
   if (suggestionContext?.onSelectRef) {
     suggestionContext.onSelectRef.current = (newValue: string) => {
       const currentPath = getNodePath(editor, domRef);
-      onSelect?.(newValue, currentPath || path || []);
-      suggestionContext?.setOpen?.(false);
+      // path 已在上方守卫，currentPath 失败时回退 path 即可
+      onSelect?.(newValue, currentPath || path);
+      suggestionContext.setOpen?.(false);
     };
   }
 };
@@ -212,7 +213,7 @@ const loadItemsData = async (
   setLoading(true);
   const result = await items(props);
   if (Array.isArray(result)) {
-    setSelectedItems(result || []);
+    setSelectedItems(result);
   }
   setLoading(false);
 };

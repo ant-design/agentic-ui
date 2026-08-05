@@ -30,6 +30,24 @@ describe('parseFootnote 分支覆盖', () => {
     });
   });
 
+  it('footnoteReferenceToTextLeaf identifier null 时回退 label', () => {
+    expect(
+      footnoteReferenceToTextLeaf({ identifier: null as any, label: 'lbl' }),
+    ).toMatchObject({
+      text: '[^lbl]',
+      identifier: 'lbl',
+    });
+  });
+
+  it('footnoteReferenceToTextLeaf identifier 与 label 均缺失', () => {
+    expect(
+      footnoteReferenceToTextLeaf({ identifier: null as any, label: null as any }),
+    ).toMatchObject({
+      text: '',
+      identifier: undefined,
+    });
+  });
+
   it('handleFootnoteReference 委托 footnoteReferenceToTextLeaf', () => {
     const result = handleFootnoteReference({ identifier: 'a' });
     expect(result.fnc).toBe(true);
@@ -60,5 +78,24 @@ describe('parseFootnote 分支覆盖', () => {
     expect(
       legacyFootnoteReferenceElementToTextLeaf({ text: 'plain' }),
     ).toMatchObject({ text: '', identifier: undefined });
+  });
+});
+
+describe('parseFootnote istanbul residual：label 优先 / 空 identifier', () => {
+  it('label 与 identifier 组合', () => {
+    expect(
+      footnoteReferenceToTextLeaf({
+        identifier: 'id',
+        label: 'lab',
+      } as any),
+    ).toMatchObject({ text: '[^id]', identifier: 'id' });
+    expect(
+      handleFootnoteReference({ identifier: undefined, label: 'L' } as any)
+        .text,
+    ).toBe('[^L]');
+    expect(
+      footnoteReferenceToTextLeaf({ identifier: '', label: 'ignored' } as any)
+        .text,
+    ).toBe('');
   });
 });

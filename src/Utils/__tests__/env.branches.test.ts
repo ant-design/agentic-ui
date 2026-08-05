@@ -19,6 +19,36 @@ describe('env 分支覆盖', () => {
     expect(isBrowser()).toBe(true);
   });
 
+  it('isBrowser window undefined 返回 false', () => {
+    const desc = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    try {
+      expect(isBrowser()).toBe(false);
+    } finally {
+      if (desc) Object.defineProperty(globalThis, 'window', desc);
+      else Reflect.deleteProperty(globalThis, 'window');
+    }
+  });
+
+  it('isBrowser document undefined 返回 false', () => {
+    const desc = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    });
+    try {
+      expect(isBrowser()).toBe(false);
+    } finally {
+      if (desc) Object.defineProperty(globalThis, 'document', desc);
+      else Reflect.deleteProperty(globalThis, 'document');
+    }
+  });
+
   it('isTest NODE_ENV=test', () => {
     expect(isTest()).toBe(true);
   });
@@ -83,5 +113,13 @@ describe('env 分支覆盖', () => {
   it('isWeChat 无 navigator 无 ua', () => {
     vi.stubGlobal('navigator', undefined);
     expect(isWeChat()).toBe(false);
+  });
+});
+
+describe('env istanbul residual：isBrowser / isTest', () => {
+  it('isBrowser 与 isTest 真值臂', () => {
+    // typeof window !== 'undefined' && typeof document !== 'undefined'
+    expect(isBrowser()).toBe(true);
+    expect(isTest()).toBe(true);
   });
 });

@@ -121,4 +121,18 @@ describe('UnsupportedFileCard 分支覆盖', () => {
     );
     expect(document.querySelector(`.${FILE_PREFIX}-item-time`)).toBeTruthy();
   });
+
+  it('无 size 且无 lastModified；可下载时展示下载区', () => {
+    render(
+      <UnsupportedFileCard
+        file={baseFile({ size: undefined, lastModified: undefined })}
+        canDownload
+        filePrefixCls={FILE_PREFIX}
+        prefixCls={PREVIEW_PREFIX}
+        hashId={HASH}
+        onDownload={vi.fn()}
+      />,
+    );
+    expect(document.querySelector(`.${FILE_PREFIX}-item-info`)).toBeTruthy();
+  });
 });

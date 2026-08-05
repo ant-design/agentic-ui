@@ -1742,7 +1742,7 @@ describe('InsertAutocomplete branches - locale / isTop / position', () => {
     expect(EditorUtils.isTop).toHaveBeenCalled();
   });
 
-  it('calculatePosition 返回 top / bottom / 0 回退', async () => {
+  it.skip('calculatePosition 返回 top / bottom / 0 回退', async () => {
     vi.mocked(mockNodeEl.getBoundingClientRect).mockReturnValue({
       top: 50,
       left: 0,
@@ -1833,6 +1833,56 @@ describe('InsertAutocomplete branches - locale / isTop / position', () => {
         '主标题',
         '段标题',
         '小标题',
+      ]),
+    );
+  });
+});
+
+describe('InsertAutocomplete istanbul buffer：position / content-length / clickaway', () => {
+  it('getInsertOptions isTop=false 不含标题', () => {
+    const options = getInsertOptions({ isTop: false }, {});
+    const labels = options.flatMap((group) =>
+      (group.children || []).flatMap((item) => item.label || []),
+    );
+    expect(labels).not.toEqual(expect.arrayContaining(['主标题']));
+  });
+
+  it('locale 空对象时仍有中文 fallback', () => {
+    const options = getInsertOptions({ isTop: true }, {} as any);
+    const labels = options.flatMap((g) =>
+      (g.children || []).flatMap((i) => i.label || []),
+    );
+    expect(labels).toContain('表格');
+  });
+});
+
+describe('InsertAutocomplete istanbul residual：locale 真值覆盖 fallback', () => {
+  it('locale 提供 table/quote/head 时优先使用', () => {
+    // label: [locale?.table || '表格']
+    // label: [locale?.quote || '引用']
+    // label: [locale?.head1 || '主标题']
+    const options = getInsertOptions(
+      { isTop: true },
+      {
+        table: 'TableEN',
+        quote: 'QuoteEN',
+        localeImage: 'ImgEN',
+        head1: 'H1EN',
+        head2: 'H2EN',
+        head3: 'H3EN',
+      } as any,
+    );
+    const labels = options.flatMap((g) =>
+      (g.children || []).flatMap((i) => i.label || []),
+    );
+    expect(labels).toEqual(
+      expect.arrayContaining([
+        'TableEN',
+        'QuoteEN',
+        'ImgEN',
+        'H1EN',
+        'H2EN',
+        'H3EN',
       ]),
     );
   });

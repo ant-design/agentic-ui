@@ -5,6 +5,7 @@ import {
   handleMarkRemoveTextOperation,
   handleTagDeleteBackward,
   handleTagRemoveTextOperation,
+  isCodeTagTextLeaf,
   moveSelectionOutOfMarkLeaf,
   shouldExitMarkOnInsertBreak,
   tryInsertTextOutsideMarkOnDoubleSpace,
@@ -236,5 +237,180 @@ describe('codeTagLeafBehavior 分支覆盖', () => {
     });
     expect(handleTagDeleteBackward(editor, 'character', vi.fn())).toBe(false);
     vi.restoreAllMocks();
+  });
+});
+
+describe('istanbul residual：codeTagLeafBehavior 假值 / 早退', () => {
+  it('shouldExitMarkOnInsertBreak：text?? 空 / offset 非末尾 / 末尾换行', () => {
+    expect(
+      shouldExitMarkOnInsertBreak({ text: undefined as any, mark: true }, 0),
+    ).toBe(true);
+    expect(
+      shouldExitMarkOnInsertBreak({ text: 'ab', mark: true }, 1),
+    ).toBe(false);
+    expect(
+      shouldExitMarkOnInsertBreak({ text: 'ab\n', mark: true }, 3),
+    ).toBe(true);
+    expect(
+      shouldExitMarkOnInsertBreak({ text: '\n', mark: true }, 1),
+    ).toBe(true);
+  });
+
+  it('handleMarkRemoveTextOperation：text/removed ?? 与删后非空返回 false', () => {
+    const editor = createEditor();
+    editor.children = [
+      {
+        type: 'paragraph',
+        children: [{ text: 'ab', mark: true, markLabel: '@' }],
+      },
+    ];
+    expect(
+      handleMarkRemoveTextOperation(
+        editor,
+        {
+          type: 'remove_text',
+          path: [0, 0],
+          offset: 0,
+          text: undefined as any,
+        },
+        vi.fn(),
+      ),
+    ).toBe(false);
+  });
+
+  it('handleMarkInsertBreak：非 collapsed / 非 mark / 不满足 exit 返回 false', () => {
+    const editor = createEditor();
+    editor.children = [
+      {
+        type: 'paragraph',
+        children: [{ text: 'ab', mark: true }],
+      },
+    ];
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 0 },
+      focus: { path: [0, 0], offset: 1 },
+    };
+    expect(handleMarkInsertBreak(editor, vi.fn())).toBe(false);
+
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 1 },
+      focus: { path: [0, 0], offset: 1 },
+    };
+    expect(handleMarkInsertBreak(editor, vi.fn())).toBe(false);
+
+    editor.children = [{ type: 'paragraph', children: [{ text: 'plain' }] }];
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 5 },
+      focus: { path: [0, 0], offset: 5 },
+    };
+    expect(handleMarkInsertBreak(editor, vi.fn())).toBe(false);
+  });
+
+  it('handleMarkInsertBreak：空 mark 叶 exit 后 insertBreak', () => {
+    const editor = createEditor();
+    editor.children = [
+      {
+        type: 'paragraph',
+        children: [{ text: '', mark: true, markLabel: '@' }],
+      },
+    ];
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 0 },
+      focus: { path: [0, 0], offset: 0 },
+    };
+    const insertBreak = vi.fn();
+    expect(handleMarkInsertBreak(editor, insertBreak)).toBe(true);
+    expect(insertBreak).toHaveBeenCalled();
+  });
+
+  it('handleMarkInsertBreak：末尾单换行 breakOffset=0 清 mark', () => {
+    const editor = createEditor();
+    editor.children = [
+      {
+        type: 'paragraph',
+        children: [{ text: '\n', mark: true, markLabel: '@' }],
+      },
+    ];
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 1 },
+      focus: { path: [0, 0], offset: 1 },
+    };
+    const insertBreak = vi.fn();
+    expect(handleMarkInsertBreak(editor, insertBreak)).toBe(true);
+    expect(insertBreak).toHaveBeenCalled();
+  });
+
+  it('moveSelectionOutOfMarkLeaf：空选区 / 非 collapsed 返回 false', () => {
+    const editor = createEditor();
+    editor.children = [
+      { type: 'paragraph', children: [{ text: 'm', mark: true }] },
+    ];
+    editor.selection = null;
+    expect(moveSelectionOutOfMarkLeaf(editor)).toBe(false);
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 0 },
+      focus: { path: [0, 0], offset: 1 },
+    };
+    expect(moveSelectionOutOfMarkLeaf(editor)).toBe(false);
+  });
+
+  it('handleTagRemoveTextOperation：空 trim 文本清 tag；全文删除占位', () => {
+    const editor = createEditor();
+    editor.children = [
+      { type: 'paragraph', children: [tagNode('  ')] },
+    ];
+    expect(
+      handleTagRemoveTextOperation(
+        editor,
+        { type: 'remove_text', path: [0, 0], offset: 0, text: ' ' },
+        vi.fn(),
+      ),
+    ).toBe(true);
+
+    editor.children = [
+      { type: 'paragraph', children: [tagNode('xy')] },
+    ];
+    expect(
+      handleTagRemoveTextOperation(
+        editor,
+        { type: 'remove_text', path: [0, 0], offset: 0, text: 'xy' },
+        vi.fn(),
+      ),
+    ).toBe(true);
+  });
+});
+
+describe('codeTagLeafBehavior istanbul residual：非 tag / apply / mark 假值', () => {
+  it('非 code/tag 叶返回 false；部分删除走 apply', () => {
+    const editor = createEditor();
+    editor.children = [
+      { type: 'paragraph', children: [{ text: 'plain' }] },
+    ];
+    const apply = vi.fn();
+    expect(
+      handleTagRemoveTextOperation(
+        editor,
+        { type: 'remove_text', path: [0, 0], offset: 0, text: 'p' },
+        apply,
+      ),
+    ).toBe(false);
+
+    editor.children = [
+      { type: 'paragraph', children: [tagNode('hello')] },
+    ];
+    expect(
+      handleTagRemoveTextOperation(
+        editor,
+        { type: 'remove_text', path: [0, 0], offset: 0, text: 'he' },
+        apply,
+      ),
+    ).toBe(true);
+    expect(apply).toHaveBeenCalled();
+  });
+
+  it('isCodeTagTextLeaf：仅 code / 仅 tag / 普通文本', () => {
+    expect(isCodeTagTextLeaf({ text: 'a', code: true } as any)).toBe(true);
+    expect(isCodeTagTextLeaf({ text: 'a', tag: true } as any)).toBe(true);
+    expect(isCodeTagTextLeaf({ text: 'a' } as any)).toBe(false);
   });
 });

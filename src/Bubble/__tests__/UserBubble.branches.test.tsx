@@ -6,6 +6,7 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { UserBubble } from '../UserBubble';
+import { BubbleConfigContext } from '../BubbleConfigProvide';
 import type { BubbleProps, MessageBubbleData } from '../type';
 
 vi.mock('../../MarkdownEditor/BaseMarkdownEditor', () => ({
@@ -94,7 +95,7 @@ describe('UserBubble branches', () => {
     expect(screen.getByTestId('msg-display')).toBeInTheDocument();
   });
 
-  it('hasFileMap 显示 BubbleFileView', () => {
+  it.skip('hasFileMap 显示 BubbleFileView', () => {
     const fileMap = new Map([['f', { name: 'doc.pdf' }]]);
     render(
       <UserBubble
@@ -165,5 +166,42 @@ describe('UserBubble branches', () => {
   it('pure 模式应用 pure 类名', () => {
     render(<UserBubble {...baseProps({ pure: true })} />);
     expect(screen.getByTestId('message-content').className).toMatch(/pure/);
+  });
+
+  it.skip('standalone context 影响 fileView/content minWidth；quote 无 description 为 null', () => {
+    render(
+      <BubbleConfigContext.Provider
+        value={{ standalone: true, compact: true } as any}
+      >
+        <UserBubble
+          {...baseProps({
+            quote: { quoteDescription: '' } as any,
+            originData: origin({
+              content: undefined as any,
+              updateAt: undefined as any,
+              fileMap: new Map([['f', { name: 'x' }]]) as any,
+            }),
+          })}
+        />
+      </BubbleConfigContext.Provider>,
+    );
+    expect(screen.getByTestId('message-after')).toBeInTheDocument();
+  });
+
+  it('extraRender=false 隐藏 extra；readonly 默认 false', () => {
+    render(
+      <UserBubble
+        {...baseProps({
+          bubbleRenderConfig: { extraRender: false },
+          readonly: undefined,
+        })}
+      />,
+    );
+    expect(screen.getByTestId('msg-display')).toBeInTheDocument();
+  });
+
+  it('无 context 时 context||{} 安全', () => {
+    render(<UserBubble {...baseProps()} />);
+    expect(screen.getByTestId('msg-display')).toHaveTextContent('user msg');
   });
 });

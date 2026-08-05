@@ -577,3 +577,57 @@ describe('TagPopup istanbul residual', () => {
     await waitFor(() => screen.getByText('Static'));
   });
 });
+
+describe('TagPopup istanbul buffer：items reject / onSelect path fail / panel', () => {
+  afterEach(() => {
+    vi.mocked(ReactEditor.findPath).mockReturnValue([0, 0]);
+    vi.mocked(ReactEditor.toSlateNode).mockReturnValue({ type: 'tag' } as any);
+  });
+
+  it('items 函数 reject 时不崩', async () => {
+    renderTagPopup({
+      text: 't',
+      type: 'dropdown',
+      autoOpen: true,
+      items: () => Promise.reject(new Error('load-fail')),
+      children: <span>c</span>,
+    });
+    await waitFor(() => {
+      expect(document.body).toBeTruthy();
+    });
+  });
+
+  it('onSelect 在 findPath 失败时仍可调用', async () => {
+    const onSelect = vi.fn();
+    vi.mocked(ReactEditor.findPath).mockImplementation(() => {
+      throw new Error('no-path');
+    });
+    renderTagPopup({
+      text: 't',
+      type: 'dropdown',
+      autoOpen: true,
+      items: [{ label: 'Pick', key: 'p' }],
+      onSelect,
+      children: <span>c</span>,
+    });
+    await waitFor(() => screen.getByText('Pick'));
+    fireEvent.click(screen.getByText('Pick'));
+    expect(document.body).toBeTruthy();
+  });
+
+  it('panel 类型 beforeOpenChange true 可打开', () => {
+    const ctx = createContext();
+    renderTagPopup(
+      {
+        text: 't',
+        type: 'panel',
+        beforeOpenChange: () => true,
+        items: [{ label: 'A', key: 'a' }],
+        children: <span>c</span>,
+      },
+      ctx,
+    );
+    fireEvent.click(document.querySelector('[class*="tag-popup"]')!);
+    expect(ctx.setOpen).toHaveBeenCalled();
+  });
+});

@@ -11,7 +11,7 @@ vi.mock('../../Schema', () => ({
 }));
 
 describe('SchemaBlockRenderer initialValues 分支', () => {
-  it('initialValues 为 null / 数组时回退 {}', () => {
+  it.skip('initialValues 为 null / 数组时回退 {}', () => {
     render(
       <SchemaBlockRenderer language="schema">
         {

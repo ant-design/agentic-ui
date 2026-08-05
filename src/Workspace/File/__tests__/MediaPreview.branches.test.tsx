@@ -80,6 +80,13 @@ describe('MediaPreview 分支覆盖', () => {
     ).toBeInTheDocument();
   });
 
+  it('video 有 locale 时使用自定义不支持文案', () => {
+    renderMedia('video', 'https://example.com/a.mp4', {
+      'workspace.file.videoNotSupported': 'Video unsupported',
+    });
+    expect(screen.getByText('Video unsupported')).toBeInTheDocument();
+  });
+
   it('audio 类别渲染 audio 控件', () => {
     const { container } = renderMedia('audio', 'https://example.com/a.mp3', {
       'workspace.file.audioNotSupported': 'Audio unsupported',

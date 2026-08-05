@@ -337,4 +337,12 @@ describe('ChartBlockRenderer 分支覆盖', () => {
       container.querySelector('[data-be="chart"]')?.className,
     ).toContain('my-chart-class');
   });
+
+  it('数组 payload；非法 JSON 返回 null；对象无 type', async () => {
+    renderChartBlock(JSON.stringify([{ chartType: 'bar', data: [{ x: 1 }] }]));
+    flushMountRaf();
+    renderChartBlock('not-json');
+    renderChartBlock(JSON.stringify({ value: { data: [] } }));
+    expect(document.body).toBeTruthy();
+  });
 });

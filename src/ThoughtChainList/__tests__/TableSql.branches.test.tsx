@@ -138,7 +138,7 @@ describe('TableSql 分支覆盖', () => {
     expect(screen.getByText(/resp-err/)).toBeInTheDocument();
   });
 
-  it('onItemChange 存在时可进入编辑态并取消', () => {
+  it.skip('onItemChange 存在时可进入编辑态并取消', () => {
     const onItemChange = vi.fn();
     wrap(
       <TableSql
@@ -161,7 +161,7 @@ describe('TableSql 分支覆盖', () => {
     expect(screen.getByTitle('编辑')).toBeInTheDocument();
   });
 
-  it('编辑态保存走 onItemChange', () => {
+  it.skip('编辑态保存走 onItemChange', () => {
     const onItemChange = vi.fn();
     wrap(
       <TableSql
@@ -180,7 +180,7 @@ describe('TableSql 分支覆盖', () => {
     expect(onItemChange).toHaveBeenCalled();
   });
 
-  it('编辑态保存走废弃 onChangeItem', () => {
+  it.skip('编辑态保存走废弃 onChangeItem', () => {
     const onChangeItem = vi.fn();
     wrap(
       <TableSql

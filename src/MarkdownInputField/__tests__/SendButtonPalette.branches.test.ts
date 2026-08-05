@@ -128,4 +128,39 @@ describe('sendButtonPalette 分支覆盖', () => {
     expect(p.backgroundMuted).toBeTruthy();
     expect(p.iconMuted).toBeTruthy();
   });
+
+  it('非法前景色与 hsl 字符串：contrast/mix 回退臂', () => {
+    const weird = {
+      colorPrimary: 'hsl(200, 50%, 40%)',
+      colorBgContainer: '#ffffff',
+      colorTextLightSolid: '',
+      colorTextTertiary: 'not-a-color',
+      colorFillTertiary: 'also-bad',
+    };
+    const p = getSendButtonPalette(weird);
+    expect(p.iconActive).toBe('#ffffff');
+    expect(p.backgroundActive).toBe('hsl(200, 50%, 40%)');
+
+    const base = getSendButtonPalette(lightToken);
+    const resolved = resolveSendButtonDisplayColors(
+      base,
+      { background: 'nope', icon: 'nope' },
+      { ...lightToken, colorBgContainer: 'bad' },
+    );
+    expect(resolved.backgroundMuted).toBeTruthy();
+    expect(resolved.iconMuted).toBeTruthy();
+  });
+
+  it('resolve：仅 backgroundHover / 仅 iconHover 不调优 muted', () => {
+    const base = getSendButtonPalette(lightToken);
+    const resolved = resolveSendButtonDisplayColors(
+      base,
+      { backgroundHover: '#111111', iconHover: '#eeeeee' },
+      lightToken,
+    );
+    expect(resolved.backgroundActive).toBe('#111111');
+    expect(resolved.iconActive).toBe('#eeeeee');
+    expect(resolved.backgroundMuted).toBe(base.backgroundMuted);
+    expect(resolved.iconMuted).toBe(base.iconMuted);
+  });
 });

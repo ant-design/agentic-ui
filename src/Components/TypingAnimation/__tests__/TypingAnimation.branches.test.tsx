@@ -336,4 +336,25 @@ describe('TypingAnimation 分支覆盖', () => {
     });
     expect(container.textContent).toBe('');
   });
+
+  it('IntersectionObserver 不可用时立即开始', () => {
+    const originalObserver = globalThis.IntersectionObserver;
+    vi.stubGlobal('IntersectionObserver', undefined);
+
+    const { container } = render(
+      <TypingAnimation
+        words={['A']}
+        delay={0}
+        duration={20}
+        loop={false}
+        showCursor={false}
+      />,
+    );
+    act(() => {
+      vi.advanceTimersByTime(20);
+    });
+
+    expect(container.textContent).toContain('A');
+    vi.stubGlobal('IntersectionObserver', originalObserver);
+  });
 });

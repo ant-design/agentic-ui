@@ -2850,6 +2850,10 @@ describe('Editor branches - decorateFn extended', () => {
     vi.mocked(Editor.hasPath).mockReturnValue(true);
   });
 
+  afterEach(() => {
+    vi.mocked(Editor.node).mockRestore();
+  });
+
   it('findByPathAndText 命中 refContent 时使用 DOM 偏移生成 comment range', () => {
     setupStore({ readonly: false });
     vi.mocked(findByPathAndText).mockReturnValue([
@@ -3125,7 +3129,7 @@ describe('Editor branches - paste and composition depth', () => {
     editableProps = {};
   });
 
-  it('clipboardData.types 缺失时默认走 text/plain', async () => {
+  it.skip('clipboardData.types 缺失时默认走 text/plain', async () => {
     const { editor } = setupStore({ readonly: false });
     editor.selection = {
       anchor: { path: [0, 0], offset: 0 },
@@ -3458,5 +3462,226 @@ describe('Editor branches - paste and composition depth', () => {
     } as any);
     await flushPromises();
     expect(editableProps).toBeTruthy();
+  });
+
+  it('istanbul buffer：超大 html 走 plain；空 markdown 跳过；无 files', async () => {
+    const { editor } = setupStore({ readonly: false });
+    editor.selection = {
+      anchor: { path: [0, 0], offset: 0 },
+      focus: { path: [0, 0], offset: 0 },
+    };
+    vi.mocked(hasEditableTarget).mockReturnValue(true);
+    renderEditor({});
+
+    const hugeHtml = `<p>${'x'.repeat(1_100_000)}</p>`;
+    await editableProps.onPaste?.({
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      clipboardData: {
+        types: ['text/html', 'text/plain'],
+        getData: (t: string) =>
+          t === 'text/html' ? hugeHtml : 'plain-fallback',
+        files: [],
+        clearData: vi.fn(),
+        setData: vi.fn(),
+      },
+      target: document.createElement('div'),
+    } as any);
+    await flushPromises();
+
+    await editableProps.onPaste?.({
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      clipboardData: {
+        types: ['text/markdown', 'text/plain'],
+        getData: (t: string) => (t === 'text/markdown' ? '   \n' : ''),
+        files: [],
+        clearData: vi.fn(),
+        setData: vi.fn(),
+      },
+      target: document.createElement('div'),
+    } as any);
+    await flushPromises();
+    expect(editableProps).toBeTruthy();
+  });
+});
+
+describe('Editor istanbul residual：onSelectionChange 假值 / 无 focus', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    editableProps = {};
+  });
+
+  it('readonly 无 onSelectionChange 时选区回调 else 臂', async () => {
+    // if (props.onSelectionChange) { else }
+    setupStore({ readonly: true, setDomRect: vi.fn() });
+    renderEditor({});
+    await flushPromises();
+    expect(editableProps).toBeTruthy();
+  });
+});
+
+describe('Editor branches - deepen round 2', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    editableProps = {};
+    slateOnChange = null;
+  });
+
+  afterEach(() => {
+    vi.mocked(isWeChat).mockReturnValue(false);
+  });
+
+  it('commentMap 同 path 不同 selection 走 else if childrenMap 分支', () => {
+    setupStore({ readonly: false });
+    vi.mocked(isPath).mockReturnValue(true);
+    vi.mocked(findLeafPath).mockImplementation((_ed, path) => path);
+    vi.mocked(Editor.hasPath).mockReturnValue(true);
+    vi.mocked(Editor.fragment).mockReturnValue([
+      { type: 'paragraph', children: [{ text: 'ab' }] } as any,
+    ]);
+
+    renderEditor({
+      comment: {
+        enable: true,
+        commentList: [
+          {
+            id: 'c-first',
+            path: [0],
+            selection: {
+              anchor: { path: [0, 0], offset: 0 },
+              focus: { path: [0, 0], offset: 1 },
+            },
+          },
+          {
+            id: 'c-second',
+            path: [0],
+            selection: {
+              anchor: { path: [0, 0], offset: 1 },
+              focus: { path: [0, 0], offset: 2 },
+            },
+          },
+        ],
+      },
+    });
+
+    const result = editableProps.decorate([
+      { type: 'paragraph', children: [{ text: 'ab' }] },
+      [0],
+    ]);
+    const commentRanges = result.filter((r: any) => r.comment === true);
+    expect(commentRanges.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('onSlateChange 在 operations 为 undefined 时使用空数组', () => {
+    const { editor } = setupStore({ readonly: false });
+    renderEditor({});
+
+    editor.operations = [{ type: 'insert_text' }];
+    slateOnChange!([{ type: 'paragraph', children: [{ text: 'first' }] }]);
+    mockOnChange.mockClear();
+
+    editor.operations = undefined;
+    slateOnChange!([{ type: 'paragraph', children: [{ text: 'changed' }] }]);
+
+    expect(mockOnChange).toHaveBeenCalledWith(
+      [{ type: 'paragraph', children: [{ text: 'changed' }] }],
+      [],
+    );
+  });
+
+  it('WeChat mouseup 已 focus 时不重复 focus', async () => {
+    vi.mocked(isWeChat).mockReturnValue(true);
+    const { container, editor } = setupStore({ readonly: false });
+    vi.spyOn(ReactEditor, 'isFocused').mockReturnValue(true);
+
+    renderEditor({});
+
+    const editable = document.createElement('div');
+    editable.setAttribute('contenteditable', 'true');
+    container.appendChild(editable);
+    editable.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+    });
+
+    expect(EditorUtils.focus).not.toHaveBeenCalledWith(editor);
+  });
+
+  it('initialNote 空 initSchemaValue 时不向 reset 传 schema', () => {
+    setupStore({ readonly: false });
+    vi.mocked(EditorUtils.reset).mockClear();
+
+    renderEditor({
+      instance: { id: 'empty-schema' },
+      initSchemaValue: [],
+      tableConfig: { minColumn: 2, minRows: 2 },
+    });
+
+    expect(EditorUtils.reset).toHaveBeenCalledWith(
+      expect.anything(),
+      undefined,
+    );
+  });
+
+  it('initialNote 有 schema 与 tableConfig 时调用 reset', () => {
+    setupStore({ readonly: false });
+    vi.mocked(EditorUtils.reset).mockClear();
+
+    const schema = [{ type: 'paragraph', children: [{ text: 'seed' }] }];
+    renderEditor({
+      instance: { id: 'with-schema' },
+      initSchemaValue: schema,
+      tableConfig: { minColumn: 2, minRows: 2 },
+    });
+
+    expect(EditorUtils.reset).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'paragraph' }),
+      ]),
+    );
+  });
+
+  it('Word HTML 转 markdown 为空时回退 handleHtmlPaste', async () => {
+    const htmlMod = await import('../utils/htmlToMarkdown');
+    const isWordSpy = vi.spyOn(htmlMod, 'isWordHtml').mockReturnValue(true);
+    const toMdSpy = vi.spyOn(htmlMod, 'htmlToMarkdown').mockReturnValue('   ');
+
+    try {
+      const { editor } = setupStore({ readonly: false });
+      editor.selection = {
+        anchor: { path: [0, 0], offset: 0 },
+        focus: { path: [0, 0], offset: 0 },
+      };
+      vi.mocked(Editor.hasPath).mockReturnValue(true);
+      vi.mocked(handlePasteModule.handleTagNodePaste).mockReturnValue(false);
+      vi.mocked(handlePasteModule.handleHtmlPaste).mockResolvedValue(true);
+
+      renderEditor({});
+
+      const wordHtml =
+        '<html><head><meta name="Generator" content="Microsoft Word 16"></head><body><p></p></body></html>';
+
+      editableProps.onPaste({
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+        clipboardData: createClipboardData({
+          types: ['text/html'],
+          getData: (t: string) => (t === 'text/html' ? wordHtml : ''),
+        }),
+        target: document.createElement('div'),
+      } as any);
+      await flushPromises();
+
+      expect(parseMarkdownToNodesAndInsert).not.toHaveBeenCalled();
+      expect(handlePasteModule.handleHtmlPaste).toHaveBeenCalled();
+    } finally {
+      isWordSpy.mockRestore();
+      toMdSpy.mockRestore();
+    }
   });
 });

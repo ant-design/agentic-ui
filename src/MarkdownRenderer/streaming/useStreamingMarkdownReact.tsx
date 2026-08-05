@@ -63,7 +63,7 @@ export const useStreamingMarkdownReact = (
     ],
   );
 
-  const prefixCls = options?.prefixCls || 'ant-agentic-md-editor';
+  const prefixCls = options?.prefixCls ?? 'ant-agentic-md-editor';
 
   const stableComponents = useShallowMemo(options?.components);
   const stableFncProps = useShallowMemo(options?.fncProps);
@@ -72,7 +72,7 @@ export const useStreamingMarkdownReact = (
     () =>
       buildEditorAlignedComponents(
         prefixCls,
-        stableComponents || {},
+        stableComponents ?? {},
         options?.streaming,
         options?.linkConfig,
         stableFncProps,
@@ -132,7 +132,7 @@ export const useStreamingMarkdownReact = (
       return splitBlocks.length > 0 ? splitBlocks : EMPTY_BLOCKS;
     } catch (error) {
       debugInfo('[MarkdownRenderer] splitMarkdownBlocks failed', {
-        error: (error as Error)?.message || String(error),
+        error: (error as Error).message || String(error),
       });
       return EMPTY_BLOCKS;
     }
