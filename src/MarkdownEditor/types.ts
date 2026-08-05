@@ -4,11 +4,11 @@ import React from 'react';
 import { BaseEditor, Editor, Selection } from 'slate';
 import { HistoryEditor } from 'slate-history';
 import { ReactEditor, RenderElementProps } from 'slate-react';
+import type { FormulaConfig } from '../Config/formulaConfig';
 import type {
   ContentThrottleOptions,
   RenderMode,
 } from '../MarkdownRenderer/types';
-import type { FormulaConfig } from '../Config/formulaConfig';
 import { TagPopupProps } from './editor/elements/TagPopup';
 import type { EditorStore } from './editor/store';
 import { InsertAutocompleteProps } from './editor/tools/InsertAutocomplete';
@@ -72,9 +72,9 @@ export interface MarkdownEditorInstance {
   range?: any;
   store: EditorStore;
   markdownContainerRef: React.MutableRefObject<HTMLDivElement | null>;
-  markdownEditorRef: React.MutableRefObject<
-    BaseEditor & ReactEditor & HistoryEditor
-  > | React.MutableRefObject<null>;
+  markdownEditorRef:
+    | React.MutableRefObject<BaseEditor & ReactEditor & HistoryEditor>
+    | React.MutableRefObject<null>;
   exportHtml: (filename?: string) => void;
   /** renderMode=markdown 时可用 */
   getDisplayedContent?: () => string;
@@ -300,7 +300,10 @@ export type MarkdownEditorProps = {
     onClick?: (url?: string) => boolean | void;
   };
 
-  /** 流式限流（仅 renderMode: 'markdown'），默认 streaming 时开启 */
+  /**
+   * 流式限流与展示配置（仅 renderMode: 'markdown'），默认 streaming 时开启限流。
+   * GPT 风格逐词淡入由 `throttleOptions.fade` 控制（默认开启，传 false 关闭）。
+   */
   throttleOptions?: ContentThrottleOptions;
 
   /** MElement 刷新依赖 */

@@ -2,13 +2,13 @@ import { Checkbox, Image } from 'antd';
 import { toJsxRuntime } from 'hast-util-to-jsx-runtime';
 import React from 'react';
 import { Fragment, jsx, jsxs } from 'react/jsx-runtime';
-import type { Processor, Plugin } from 'unified';
+import type { Plugin, Processor } from 'unified';
 
+import type { FormulaConfig } from '../Config/formulaConfig';
 import type {
   MarkdownRemarkPlugin,
   MarkdownToHtmlConfig,
 } from '../MarkdownEditor/editor/utils/markdownToHtml';
-import type { FormulaConfig } from '../Config/formulaConfig';
 import type { MarkdownEditorProps } from '../MarkdownEditor/types';
 import { ToolUseBarThink } from '../ToolUseBarThink';
 import { debugInfo } from '../Utils/debugUtils';
@@ -776,12 +776,28 @@ const BLOCKQUOTE_PATTERN = /^\s*>/;
 const HTML_COMMENT_PATTERN = /^\s*<!--/;
 const FOOTNOTE_DEF_PATTERN = /^\s*\[\^/;
 
-/** 按单空行拆块，保留围栏代码块、列表、blockquote、HTML 注释+表格、脚注定义、GFM 表格的连续性 */
+/** 匹配 think 标签开标签：`<think>`、`<thinking>`、`<redacted_thinking>`，支持属性（如 `<think lang="zh">`） */
+const THINK_OPEN_RE = /^<(think|thinking|redacted_thinking)\b[^>]*>\s*$/;
+/** 匹配 think 标签闭标签（独占一行） */
+const THINK_CLOSE_RE = /^<\/(think|thinking|redacted_thinking)\s*>$/;
+/** 匹配行内出现的 think 闭标签（如 `content`） */
+const THINK_CLOSE_INLINE_RE = /<\/(think|thinking|redacted_thinking)\s*>/;
+/**
+ * 匹配「开标签 + 内容 + 闭标签」在同一行的 think 标签对（如 `<think>inline content</think>`）。
+ * 这种情况无需进入 inThinkTag 状态，整行保留在当前 block 即可。
+ */
+const THINK_INLINE_PAIR_RE =
+  /^<(think|thinking|redacted_thinking)\b[^>]*>([\s\S]*)<\/(think|thinking|redacted_thinking)\s*>$/;
+/** 匹配同行开标签后紧跟非空白内容（如 `<think>content`，闭标签在后续行） */
+const THINK_OPEN_INLINE_RE = /^<(think|thinking|redacted_thinking)\b[^>]*>\S/;
+
+/** 按单空行拆块，保留围栏代码块、列表、blockquote、HTML 注释+表格、脚注定义、think 标签、GFM 表格的连续性 */
 const splitMarkdownBlocks = (content: string): string[] => {
   const lines = content.split('\n');
   const blocks: string[] = [];
   let current: string[] = [];
   let fenceState = { ...INITIAL_FENCE_STATE };
+  let inThinkTag = false;
   let inList = false;
   let inBlockquote = false;
   let pendingBlankLines = 0;
@@ -797,6 +813,141 @@ const splitMarkdownBlocks = (content: string): string[] => {
     fenceState = updateFenceStateForLine(fenceState, line);
 
     if (fenceState.inFenced) {
+      if (pendingBlankLines > 0) {
+        for (let i = 0; i < pendingBlankLines; i++) current.push('');
+        pendingBlankLines = 0;
+      }
+      current.push(line);
+      continue;
+    }
+
+    // 同行完整标签对（如 `<think>inline</think>`），无需进入 think 上下文，整行保留
+    const trimmedLine = line.trim();
+    if (!inThinkTag && THINK_INLINE_PAIR_RE.test(trimmedLine)) {
+      // 空行 + 同行标签对：空行标志着段落边界，先提交前一个 block
+      if (pendingBlankLines > 0 && current.length > 0) {
+        blocks.push(current.join('\n'));
+        current = [];
+        pendingBlankLines = 0;
+      } else if (pendingBlankLines > 0) {
+        for (let i = 0; i < pendingBlankLines; i++) current.push('');
+        pendingBlankLines = 0;
+      }
+      current.push(line);
+      continue;
+    }
+
+    // 检测 think 开标签独占一行（如 `<think>`）
+    if (!inThinkTag && THINK_OPEN_RE.test(trimmedLine)) {
+      inThinkTag = true;
+      // 空行 + think 开标签：空行标志着段落边界，先提交前一个 block
+      if (pendingBlankLines > 0 && current.length > 0) {
+        blocks.push(current.join('\n'));
+        current = [];
+        pendingBlankLines = 0;
+      } else if (pendingBlankLines > 0) {
+        for (let i = 0; i < pendingBlankLines; i++) current.push('');
+        pendingBlankLines = 0;
+      }
+      current.push(line);
+      continue;
+    }
+
+    // 同行开标签后紧跟内容（如 `<think>content`），闭标签在后续行 → 进入 think 上下文
+    if (!inThinkTag && THINK_OPEN_INLINE_RE.test(trimmedLine)) {
+      inThinkTag = true;
+      // 空行 + think 开标签：空行标志着段落边界，先提交前一个 block
+      if (pendingBlankLines > 0 && current.length > 0) {
+        blocks.push(current.join('\n'));
+        current = [];
+        pendingBlankLines = 0;
+      } else if (pendingBlankLines > 0) {
+        for (let i = 0; i < pendingBlankLines; i++) current.push('');
+        pendingBlankLines = 0;
+      }
+      current.push(line);
+      continue;
+    }
+
+    // 在 think 上下文内，跳过空行切分，所有内容推入当前 block
+    if (inThinkTag) {
+      // 场景 2：inThinkTag 内遇到新的 think 开标签 → 隐式关闭上一个块，开启新块
+      if (
+        THINK_OPEN_RE.test(trimmedLine) ||
+        THINK_OPEN_INLINE_RE.test(trimmedLine)
+      ) {
+        // 提交之前 pending 的空行
+        if (pendingBlankLines > 0) {
+          for (let i = 0; i < pendingBlankLines; i++) current.push('');
+          pendingBlankLines = 0;
+        }
+        // 先提交当前 think block（隐式关闭）
+        blocks.push(current.join('\n'));
+        current = [];
+        // 新开标签进入下一个 block，保持 inThinkTag = true
+        current.push(line);
+        continue;
+      }
+
+      // 检测闭标签：独占一行 → 闭标签后紧接的正文应独立成块
+      if (THINK_CLOSE_RE.test(trimmedLine)) {
+        inThinkTag = false;
+        if (pendingBlankLines > 0) {
+          for (let i = 0; i < pendingBlankLines; i++) current.push('');
+          pendingBlankLines = 0;
+        }
+        current.push(line);
+        // 提交 think block，后续内容进入新 block
+        blocks.push(current.join('\n'));
+        current = [];
+        inList = false;
+        inBlockquote = false;
+        continue;
+      }
+
+      // 检测行内闭标签：闭标签后可能紧跟正文（场景 1）
+      if (THINK_CLOSE_INLINE_RE.test(trimmedLine)) {
+        inThinkTag = false;
+        if (pendingBlankLines > 0) {
+          for (let i = 0; i < pendingBlankLines; i++) current.push('');
+          pendingBlankLines = 0;
+        }
+        const closeMatch = trimmedLine.match(THINK_CLOSE_INLINE_RE);
+        const closeTagEnd =
+          trimmedLine.indexOf(closeMatch![0]) + closeMatch![0].length;
+        const afterClose = trimmedLine.slice(closeTagEnd).trim();
+        if (afterClose.length > 0) {
+          // 闭标签后还有内容：先提交 think block（含闭标签部分），再让剩余内容独立成块
+          // 将当前行在闭标签处拆为两部分
+          const lineBeforeClose = line.slice(
+            0,
+            line.indexOf(closeMatch![0]) + closeMatch![0].length,
+          );
+          const lineAfterClose = line.slice(
+            line.indexOf(closeMatch![0]) + closeMatch![0].length,
+          );
+          current.push(lineBeforeClose);
+          blocks.push(current.join('\n'));
+          current = [];
+          inList = false;
+          inBlockquote = false;
+          // 闭标签后的内容作为新 block 的首行
+          if (lineAfterClose.trim().length > 0) {
+            current.push(lineAfterClose.replace(/^\n/, ''));
+          }
+        } else {
+          current.push(line);
+          // 行内闭标签位于行末（闭标签后无同行内容），也需提交 think block，
+          // 避免后续下一行正文被合并到同一 block（如 "构造调用。</think>\n正文"）
+          blocks.push(current.join('\n'));
+          current = [];
+          inList = false;
+          inBlockquote = false;
+        }
+        continue;
+      }
+
+      // 提交之前 pending 的空行
       if (pendingBlankLines > 0) {
         for (let i = 0; i < pendingBlankLines; i++) current.push('');
         pendingBlankLines = 0;
@@ -880,6 +1031,8 @@ export interface UseMarkdownToReactOptions {
   };
   fncProps?: MarkdownEditorProps['fncProps'];
   streaming?: boolean;
+  /** 是否对文本拆分 token 做逐词淡入（已含 streaming 判定，由上层解析后传入） */
+  fadeTokens?: boolean;
   /** 原始流字符串，与 useStreaming 输出分离避免缓存误判 */
   contentRevisionSource?: string;
   /** 返回 undefined 回退默认渲染 */

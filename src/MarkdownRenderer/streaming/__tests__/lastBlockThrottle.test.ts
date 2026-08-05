@@ -14,6 +14,18 @@ describe('shouldReparseLastBlock', () => {
     expect(shouldReparseLastBlock(prev, next, true)).toBe(false);
   });
 
+  it('流式末块缩短时立即重新 parse', () => {
+    const prev = 'answer continued';
+    const next = 'answer';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
+  });
+
+  it('流式末块被非前缀内容替换时立即重新 parse', () => {
+    const prev = 'first answer';
+    const next = 'regenerated answer';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
+  });
+
   it('围栏闭合后恢复节流', () => {
     const prev = '```js\nx\n```\n';
     const next = '```js\nx\n```\nmore';
@@ -23,6 +35,12 @@ describe('shouldReparseLastBlock', () => {
   it('流式末块在 GFM 表格内不因 | 或 - 立即重 parse', () => {
     const prev = '| a | b |\n| - | - |\n| 1';
     const next = '| a | b |\n| - | - |\n| 1 |';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(false);
+  });
+
+  it('流式末块在无边框 GFM 表格内不因 | 或 - 立即重 parse', () => {
+    const prev = 'a | b\n- | -\n1';
+    const next = 'a | b\n- | -\n1 |';
     expect(shouldReparseLastBlock(prev, next, true)).toBe(false);
   });
 
@@ -67,5 +85,29 @@ describe('shouldReparseLastBlock', () => {
 
   it('行内起点触发重 parse', () => {
     expect(shouldReparseLastBlock('hi ', 'hi [', true)).toBe(true);
+  });
+
+  it('未闭合 think 内换行应立即重 parse', () => {
+    const prev = '<think>\nreasoning';
+    const next = '<think>\nreasoning\nmore';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
+  });
+
+  it('未闭合 think 闭合标签出现时应立即重 parse', () => {
+    const prev = '<think>\nreasoning';
+    const next = '<think>\nreasoning</think>';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
+  });
+
+  it('未闭合 think 内小增量字母仍按字符节流', () => {
+    const prev = '<think>\nreasoning';
+    const next = '<think>\nreasoningx';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(false);
+  });
+
+  it('thinking 别名闭合时也应立即重 parse', () => {
+    const prev = '<thinking>\nstep';
+    const next = '<thinking>\nstep</thinking>';
+    expect(shouldReparseLastBlock(prev, next, true)).toBe(true);
   });
 });

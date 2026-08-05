@@ -26,6 +26,15 @@ group:
 
 ## Unreleased
 
+- MarkdownEditor
+  - 🐞 Fixed table flickering by removing the table row entry animation (`agenticMdBlurFadeIn` on `tbody tr`). Streaming remounts rows and used to replay the blur fade-in; keyframes are kept only for `MarkdownRenderer` word-by-word fade-in.
+
+- MarkdownRenderer
+  - 🆕 Added GPT-style streaming word-by-word fade-in: while `streaming`, new words fade in individually; already-shown content reuses DOM without flickering. Pure CSS, honors `prefers-reduced-motion`; skips code blocks / tables / formulas.
+  - 🆕 Fade toggle lives in `throttleOptions.fade` (default `true`, only when `streaming`): pass `throttleOptions={{ fade: false }}` to disable. Works via existing `throttleOptions` on `MarkdownEditor` (`renderMode: 'markdown'`) and `Bubble.markdownRenderConfig`.
+  - 🛠 Token splitting via a last-registered rehype plugin on the final hast; processor instance stays stable during a streaming session to avoid remounting charts/code blocks.
+  - 📖 Tidied `markdown-renderer.md` (demo sections, alphabetical API tables, `ContentThrottleOptions.fade`); synced `api.md` / `bubble.md` / Playground and the streaming compare demo.
+
 - TaskList
   - 🛠 `simple` variant drops the 2px progress bar underneath the summary; `showProgress` now only toggles the inline "completed/total" count text.
   - 🆕 Added `scrollIntoViewOnExpand` (`boolean | ScrollIntoViewOptions`, default `false`): when the `simple` summary expands, scroll the component into the viewport. `true` resolves to `{ behavior: 'smooth', block: 'nearest' }`; the initial mount does not trigger it.
@@ -55,7 +64,7 @@ group:
   - 🛠 Defensive guards: flatten `Fragment` children, dedupe `tab.key`, ignore segmented divider / invalid tab keys, validate `panelType` / `tab.count`, `normalizeTabKey`, cap `type`-chain walk depth.
 
 - 📖 Docs
-  - 📖 Added `MarkdownRenderer` component documentation (streaming Markdown rendering, `CharacterQueueOptions`, built-in code-block renderer routing, `MarkdownRendererRef` imperative API).
+  - 📖 Added `MarkdownRenderer` component documentation (streaming Markdown, `ContentThrottleOptions`, built-in code-block renderer routing, `MarkdownRendererRef`).
   - 📖 Added a dedicated `ToolUseBarThink` doc; corrected the `ToolUseBarThink` API table inside `tool-use-bar.md` (removed deprecated/non-existent props such as `id`, `isThinkLoading`, `isActive`, `onActiveChange`, etc., aligned with actual props).
   - 📖 Added `GradientText`, `TextAnimate`, and `TypingAnimation` component docs with demos.
   - 📖 Added an "API Playground" comprehensive demo for `MarkdownRenderer` / `GradientText` / `TextAnimate` / `ToolUseBarThink`, showcasing each component's core props and behavior in a single interactive demo.

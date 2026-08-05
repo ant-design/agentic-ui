@@ -467,6 +467,7 @@ export const TagPopup = (props: RenderProps) => {
     onClick: (e: any) => {
       onSelect?.(e.key?.trim() || '', currentNodePath.current || []);
       suggestionContext?.setOpen?.(false);
+      setOpen(false);
     },
   } as MenuProps;
 

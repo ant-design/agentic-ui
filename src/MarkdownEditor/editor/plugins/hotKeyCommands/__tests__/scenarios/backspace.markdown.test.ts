@@ -11,6 +11,7 @@ import { ReactEditor, withReact } from 'slate-react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { parserSlateNodeToMarkdown } from '../../../../utils';
 import { EditorUtils } from '../../../../utils/editorUtils';
+import { withCodeBlockPlugin } from '../../../withCodeBlockPlugin';
 import { withMarkdown } from '../../../withMarkdown';
 import { BackspaceKey } from '../../backspace';
 
@@ -353,9 +354,15 @@ describe('BackspaceKey - Markdown 输出测试', () => {
       expect(result).toBe(true);
     });
 
-    it('应该合并段落到空的 code 元素后', () => {
+    it('应该将段落合并到 void code 的 value 并保留 Markdown 内容', () => {
+      withCodeBlockPlugin(editor);
       editor.children = [
-        { type: 'code', children: [{ text: '' }] },
+        {
+          type: 'code',
+          language: 'ts',
+          value: 'const existing = true;\n',
+          children: [{ text: '' }],
+        },
         { type: 'paragraph', children: [{ text: 'Text' }] },
       ];
 
@@ -365,7 +372,19 @@ describe('BackspaceKey - Markdown 输出测试', () => {
       });
 
       const result = backspaceKey.run();
+
       expect(result).toBe(true);
+      expect(editor.children).toEqual([
+        {
+          type: 'code',
+          language: 'ts',
+          value: 'const existing = true;\nText',
+          children: [{ text: '' }],
+        },
+      ]);
+      expect(getMarkdown()).toBe(
+        '```ts\nconst existing = true;\nText\n```',
+      );
     });
   });
 

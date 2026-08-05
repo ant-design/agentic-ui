@@ -855,6 +855,18 @@ describe('TaskList', () => {
       render(<TaskList items={simpleItems} variant="simple" />);
 
       expect(screen.getByText('正在进行Running Task任务')).toBeInTheDocument();
+      expect(
+        screen.queryByTestId('task-list-simple-progress-count'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('showProgress=true 时展示已完成/总数计数且保留当前任务摘要', () => {
+      render(<TaskList items={simpleItems} variant="simple" showProgress />);
+
+      expect(screen.getByText('正在进行Running Task任务')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('task-list-simple-progress-count'),
+      ).toHaveTextContent('1/3');
     });
 
     it('应该显示当前正在运行的任务名称', () => {
@@ -873,6 +885,27 @@ describe('TaskList', () => {
         expect(screen.getByText('Completed Task')).toBeInTheDocument();
         expect(screen.getByText('Running Task')).toBeInTheDocument();
         expect(screen.getByText('Pending Task')).toBeInTheDocument();
+      });
+    });
+
+    it('loading=true 且无任务项时摘要显示进行中', () => {
+      render(<TaskList items={[]} variant="simple" loading={true} />);
+
+      expect(screen.getByText('正在进行任务')).toBeInTheDocument();
+      expect(
+        screen.getByTestId('task-list-simple-summary-status-loading'),
+      ).toBeInTheDocument();
+    });
+
+    it('点击箭头 ActionIconBox 应展开任务列表', async () => {
+      render(<TaskList items={simpleItems} variant="simple" />);
+
+      const bar = screen.getByTestId('task-list-simple-bar');
+      const arrowBox = within(bar).getByTestId('action-icon-box');
+      fireEvent.click(arrowBox);
+
+      await waitFor(() => {
+        expect(screen.getByText('Completed Task')).toBeInTheDocument();
       });
     });
 
@@ -1234,6 +1267,54 @@ describe('TaskList', () => {
         });
 
         expect(scrollIntoViewSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+        delete (Element.prototype as Partial<Element>).scrollIntoView;
+      }
+    });
+
+    it('展开后在滚动定时器触发前收起应取消滚动，避免视口跳动', () => {
+      const scrollIntoViewSpy = vi.fn();
+      vi.useFakeTimers();
+      Element.prototype.scrollIntoView = scrollIntoViewSpy;
+
+      try {
+        const { rerender } = render(
+          <TaskList
+            items={simpleItems}
+            variant="simple"
+            open={false}
+            scrollIntoViewOnExpand
+          />,
+        );
+
+        rerender(
+          <TaskList
+            items={simpleItems}
+            variant="simple"
+            open={true}
+            scrollIntoViewOnExpand
+          />,
+        );
+
+        act(() => {
+          vi.advanceTimersByTime(100);
+        });
+        expect(scrollIntoViewSpy).not.toHaveBeenCalled();
+
+        rerender(
+          <TaskList
+            items={simpleItems}
+            variant="simple"
+            open={false}
+            scrollIntoViewOnExpand
+          />,
+        );
+
+        act(() => {
+          vi.advanceTimersByTime(350);
+        });
+        expect(scrollIntoViewSpy).not.toHaveBeenCalled();
       } finally {
         vi.useRealTimers();
         delete (Element.prototype as Partial<Element>).scrollIntoView;

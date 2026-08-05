@@ -38,4 +38,32 @@ describe('fenceTracker', () => {
     expect(endsInsideUnclosedFence('```json\n{"value":1')).toBe(true);
     expect(endsInsideUnclosedFence('```json\n{"value":1}\n```')).toBe(false);
   });
+
+  it('does not close a longer open fence with a shorter marker', () => {
+    const opened = updateFenceStateForLine(INITIAL_FENCE_STATE, '````ts');
+    expect(opened).toEqual({
+      inFenced: true,
+      fenceChar: '`',
+      fenceLen: 4,
+    });
+
+    // CommonMark: closing fence must be at least as long as the opener.
+    const stillOpen = updateFenceStateForLine(opened, '```');
+    expect(stillOpen).toEqual(opened);
+
+    const closed = updateFenceStateForLine(stillOpen, '````');
+    expect(closed).toEqual(INITIAL_FENCE_STATE);
+
+    expect(endsInsideUnclosedFence('````\ncode\n```')).toBe(true);
+    expect(endsInsideUnclosedFence('````\ncode\n````')).toBe(false);
+  });
+
+  it('ignores indented fence-like lines that are not fence markers', () => {
+    const opened = updateFenceStateForLine(INITIAL_FENCE_STATE, '```');
+    // Leading spaces after trimStart still match; ensure non-fence content stays unchanged.
+    expect(updateFenceStateForLine(opened, 'const x = 1;')).toEqual(opened);
+    expect(updateFenceStateForLine(INITIAL_FENCE_STATE, 'not a fence')).toEqual(
+      INITIAL_FENCE_STATE,
+    );
+  });
 });

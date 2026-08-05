@@ -51,29 +51,42 @@ describe('CI 构建环境配置', () => {
     const MIN_WEBSERVER_TIMEOUT_MS = 360 * 1000;
     const playwrightConfig = readRepoFile('playwright.config.ts');
 
-    /** 解析 webServer 块内 `timeout: N`、`timeout: N * M` 或三元表达式毫秒值 */
+    /** 解析 webServer 块内 timeout 毫秒值（含三元表达式各分支） */
     const resolveWebServerTimeoutMs = (source: string): number | null => {
       const webServerIndex = source.indexOf('webServer');
       if (webServerIndex === -1) {
         return null;
       }
       const scoped = source.slice(webServerIndex);
-      // timeout: process.env.X ? 180 * 1000 : 720 * 1000
-      const ternary = scoped.match(
-        /timeout:\s*[^\n?]+\?\s*(\d+)\s*\*\s*(\d+)\s*:\s*(\d+)\s*\*\s*(\d+)/,
-      );
-      if (ternary) {
-        const a = Number(ternary[1]) * Number(ternary[2]);
-        const b = Number(ternary[3]) * Number(ternary[4]);
-        return Math.max(a, b);
-      }
-      const match = scoped.match(/timeout:\s*(\d+)\s*(?:\*\s*(\d+))?/);
-      if (!match) {
+      const timeoutIndex = scoped.indexOf('timeout:');
+      if (timeoutIndex === -1) {
         return null;
       }
-      const base = Number(match[1]);
-      const factor = match[2] ? Number(match[2]) : 1;
-      return base * factor;
+      const timeoutScoped = scoped.slice(timeoutIndex);
+      const parseTimeoutExpr = (expr: string): number | null => {
+        const match = expr.match(/^\s*(\d+)\s*(?:\*\s*(\d+))?/);
+        if (!match) {
+          return null;
+        }
+        const base = Number(match[1]);
+        const factor = match[2] ? Number(match[2]) : 1;
+        return base * factor;
+      };
+
+      const ternaryMatch = timeoutScoped.match(
+        /timeout:\s*[^?]+\?\s*([^:]+)\s*:\s*([^,}\n]+)/,
+      );
+      if (ternaryMatch) {
+        const branchValues = [ternaryMatch[1], ternaryMatch[2]]
+          .map((branch) => parseTimeoutExpr(branch.trim()))
+          .filter((value): value is number => value !== null);
+        if (branchValues.length === 0) {
+          return null;
+        }
+        return Math.max(...branchValues);
+      }
+
+      return parseTimeoutExpr(timeoutScoped.slice('timeout:'.length));
     };
 
     it('应配置 webServer 自动启动命令', () => {

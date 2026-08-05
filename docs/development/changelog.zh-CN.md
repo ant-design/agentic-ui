@@ -26,6 +26,15 @@ group:
 
 ## 未发布
 
+- MarkdownEditor
+  - 🐞 修复表格闪动：删除表格行入场动画（`tbody tr` 的 `agenticMdBlurFadeIn`）。流式增量会反复重挂表格行导致 blur 淡入重放；`agenticMdBlurFadeIn` keyframes 仅保留供 `MarkdownRenderer` 流式逐词淡入使用。
+
+- MarkdownRenderer
+  - 🆕 新增 GPT 风格流式逐词淡入：`streaming` 时默认对新词淡入，已显示内容复用 DOM、不闪烁；纯 CSS，尊重 `prefers-reduced-motion`；代码块 / 表格 / 公式不拆词。
+  - 🆕 淡入开关收敛至 `throttleOptions.fade`（默认 `true`，仅 `streaming` 时生效）：`throttleOptions={{ fade: false }}` 关闭。`MarkdownEditor`（`renderMode: 'markdown'`）与 `Bubble.markdownRenderConfig` 经既有 `throttleOptions` 透传即可。
+  - 🛠 通过末注册 rehype 插件在最终 hast 上拆分文本 token；processor 在流式会话内保持同一实例，避免 chart / 代码块卸载重挂。
+  - 📖 整理 `markdown-renderer.md`：演示分区、API 表字母序、`ContentThrottleOptions.fade` 说明；同步 `api.md` / `bubble.md` / Playground 与流式对比 Demo。
+
 - TaskList
   - 🛠 `simple` 模式移除摘要条下方 2px 细线进度条；`showProgress` 现仅控制摘要内「已完成/总数」计数文本是否展示。
   - 🆕 新增 `scrollIntoViewOnExpand` 属性（`boolean | ScrollIntoViewOptions`，默认 `false`）：`simple` 模式下展开摘要条时将组件滚动到视窗内；传 `true` 走默认 `{ behavior: 'smooth', block: 'nearest' }`，初次挂载不触发。
@@ -55,7 +64,7 @@ group:
   - 🛠 防御性处理：展开 `Fragment` 子节点、去重 `tab.key`、忽略 Segmented 分隔项与非法切换 key、校验 `panelType` / `tab.count`、`normalizeTabKey`、限制 `type` 链遍历深度。
 
 - 📖 文档
-  - 📖 新增 `MarkdownRenderer` 组件文档（流式 Markdown 渲染、`CharacterQueueOptions`、内置代码块渲染器路由表、`MarkdownRendererRef` 命令式接口）。
+  - 📖 新增 `MarkdownRenderer` 组件文档（流式 Markdown、`ContentThrottleOptions`、内置代码块渲染器路由表、`MarkdownRendererRef`）。
   - 📖 新增 `ToolUseBarThink` 独立组件文档；同步修正 `ToolUseBar` 中 `ToolUseBarThink` 的 API 表（移除已废弃 / 不存在的 `id` / `isThinkLoading` / `isActive` / `onActiveChange` 等字段，对齐实际 props）。
   - 📖 新增 `GradientText`、`TextAnimate`、`TypingAnimation` 组件文档与对应 demo。
   - 📖 为 `MarkdownRenderer` / `GradientText` / `TextAnimate` / `ToolUseBarThink` 各补充一份「API Playground」综合 demo，单一演示串联调试各组件的核心 props 与行为。

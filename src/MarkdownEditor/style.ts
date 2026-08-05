@@ -1,6 +1,5 @@
 import type { CSSInterpolation } from '@ant-design/cssinjs';
 import {
-  DEFAULT_TEXT_SWAP_DURATION_MS,
   TEXT_SWAP_BLUR_PX,
   TEXT_SWAP_EASING,
 } from '../Components/TextSwap/constants';
@@ -17,6 +16,7 @@ import {
   type FullToken,
   type GenStyleFn,
 } from '../Hooks/useStyle';
+import { STREAM_TOKEN_CLASS } from '../MarkdownRenderer/streaming/rehypeStreamingTokens';
 
 // ── Table ──────────────────────────────────────────────────────────────────
 const TABLE_BORDER = '1px solid var(--agentic-ui-table-border-color, #E7E9E8)';
@@ -140,9 +140,6 @@ const genTableStyle = (
         'tr:last-child td:not(.config-td)': { borderBottom: 'none' },
         'tr td:first-child:not(.config-td)': { fontWeight: 600 },
 
-        'tbody tr:not(.config-tr)': {
-          animation: `agenticMdBlurFadeIn ${DEFAULT_TEXT_SWAP_DURATION_MS}ms ${TEXT_SWAP_EASING} both`,
-        },
         'tbody tr:not(.config-tr):hover': {
           background:
             'linear-gradient(var(--agentic-ui-table-hover-bg, rgba(0, 0, 0, 0.04)), var(--agentic-ui-table-hover-bg, rgba(0, 0, 0, 0.04))), linear-gradient(var(--agentic-ui-table-cell-bg, var(--color-gray-bg-card-white)), var(--agentic-ui-table-cell-bg, var(--color-gray-bg-card-white)))',
@@ -312,14 +309,34 @@ const genTableStyle = (
         filter: 'blur(0)',
       },
     },
+  };
+};
 
+// ── 流式逐词淡入（GPT 风格） ─────────────────────────────────────────────────
+/** 单个 token 的淡入时长（ms）；略长于限流帧间隔，形成连续的「波浪」淡入 */
+const STREAM_TOKEN_DURATION_MS = 420;
+
+/**
+ * 仅在流式容器 `${componentCls}-content-streaming` 内对 token span 应用淡入。
+ * 已渲染 token 重解析时复用 DOM、动画不重放；新 token 挂载各自淡入一次，
+ * 叠加限流的逐字推进，得到接近 GPT 的平滑出字效果。
+ *
+ * 使用 `agenticMdBlurFadeIn` keyframes（opacity + blur 淡入）。
+ */
+const genStreamingTokenStyle = (
+  token: FullToken<'MarkdownEditor'>,
+): Record<string, CSSInterpolation> => ({
+  [`${token.componentCls}-content-streaming`]: {
+    [`.${STREAM_TOKEN_CLASS}`]: {
+      animation: `agenticMdBlurFadeIn ${STREAM_TOKEN_DURATION_MS}ms ${TEXT_SWAP_EASING} both`,
+    },
     '@media (prefers-reduced-motion: reduce)': {
-      [`${tableCls} table tbody tr:not(.config-tr)`]: {
+      [`.${STREAM_TOKEN_CLASS}`]: {
         animation: 'none',
       },
     },
-  };
-};
+  },
+});
 
 const genStyle: GenStyleFn<'MarkdownEditor'> = (token) => {
   return {
@@ -687,6 +704,9 @@ const genStyle: GenStyleFn<'MarkdownEditor'> = (token) => {
       // --- Table（全部样式统一在 genTableStyle 中）---
       ...genTableStyle(token, MOBILE_BREAKPOINT, MOBILE_PADDING),
     },
+
+    // --- 流式逐词淡入（GPT 风格）---
+    ...genStreamingTokenStyle(token),
   };
 };
 

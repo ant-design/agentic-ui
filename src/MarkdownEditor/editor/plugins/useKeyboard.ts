@@ -203,36 +203,147 @@ export const useKeyboard = (
 
       if (e.key.toLowerCase().startsWith('arrow')) {
         if (['ArrowUp', 'ArrowDown'].includes(e.key)) return;
-        // 处理 tag 前的空格插入
         if (e.key === 'ArrowLeft') {
           const selection = markdownEditorRef.current.selection;
           if (selection && Range.isCollapsed(selection)) {
-            const [node] = Editor.nodes(markdownEditorRef.current, {
-              at: selection.focus.path,
-              match: (n) => n.tag === true,
-            });
+            const alFocusPath = selection.focus.path;
+            const alOffset = selection.focus.offset;
+            try {
+              const [node] = Editor.nodes(markdownEditorRef.current, {
+                at: alFocusPath,
+                match: (n) => (n as any).tag === true,
+              });
 
-            if (node) {
-              const [, tagPath] = node;
-              const offset = selection.focus.offset;
-              // 当光标在 tag 开始位置时，检查前面是否需要插入空格
-              if (offset === 0) {
-                const [prevNode] =
-                  Editor.previous(markdownEditorRef.current, { at: tagPath }) ||
-                  [];
-                if (!prevNode || !(prevNode as any).text?.endsWith('\uFEFF')) {
-                  e.preventDefault();
-                  Transforms.insertNodes(
-                    markdownEditorRef.current,
-                    [{ text: '\uFEFF' }],
-                    {
+              if (node) {
+                const [, tagPath] = node;
+                const offset = alOffset;
+                if (offset === 0) {
+                  const [prevNode, prevPath] =
+                    Editor.previous(markdownEditorRef.current, {
                       at: tagPath,
-                      select: true,
-                    },
-                  );
+                    }) || [];
+                  if (!prevNode || !(prevNode as any).text?.endsWith('\uFEFF')) {
+                    e.preventDefault();
+                    Transforms.insertNodes(
+                      markdownEditorRef.current,
+                      [{ text: '\uFEFF' }],
+                      { at: tagPath, select: true },
+                    );
+                    return;
+                  }
+                  // BOM 已存在：将光标移到 BOM 节点末尾
+                  if (prevPath) {
+                    e.preventDefault();
+                    Transforms.select(markdownEditorRef.current, {
+                      anchor: Editor.end(markdownEditorRef.current, prevPath),
+                      focus: Editor.end(markdownEditorRef.current, prevPath),
+                    });
+                  }
+                  return;
+                } else {
+                  // 光标在 chip 内部非零位置：直接跳到 chip 之前
+                  e.preventDefault();
+                  const [, alPrevPath] =
+                    Editor.previous(markdownEditorRef.current, {
+                      at: tagPath,
+                    }) || [];
+                  if (alPrevPath) {
+                    Transforms.select(markdownEditorRef.current, {
+                      anchor: Editor.end(markdownEditorRef.current, alPrevPath),
+                      focus: Editor.end(markdownEditorRef.current, alPrevPath),
+                    });
+                  }
                   return;
                 }
+              } else if (alOffset === 0 && Path.hasPrevious(alFocusPath)) {
+                // 光标在非 tag 节点起始位置：检查前一个兄弟是否是 chip，是则跳过
+                const alPrevSibPath = Path.previous(alFocusPath);
+                if (Editor.hasPath(markdownEditorRef.current, alPrevSibPath)) {
+                  const [alPrevSibNode] = Editor.leaf(
+                    markdownEditorRef.current,
+                    alPrevSibPath,
+                  );
+                  if ((alPrevSibNode as any).tag) {
+                    e.preventDefault();
+                    if (Path.hasPrevious(alPrevSibPath)) {
+                      const alPrevPrevPath = Path.previous(alPrevSibPath);
+                      if (
+                        Editor.hasPath(
+                          markdownEditorRef.current,
+                          alPrevPrevPath,
+                        )
+                      ) {
+                        Transforms.select(markdownEditorRef.current, {
+                          anchor: Editor.end(
+                            markdownEditorRef.current,
+                            alPrevPrevPath,
+                          ),
+                          focus: Editor.end(
+                            markdownEditorRef.current,
+                            alPrevPrevPath,
+                          ),
+                        });
+                      }
+                    }
+                    return;
+                  }
+                }
               }
+            } catch (_err) {}
+          }
+        }
+
+        // When cursor is at the end of the leaf before a tag leaf, ArrowRight
+        // jumps directly to the node after the chip, bypassing the
+        // contentEditable=false DOM so Slate selection updates correctly.
+        if (e.key === 'ArrowRight') {
+          const selection = markdownEditorRef.current.selection;
+          if (selection && Range.isCollapsed(selection)) {
+            const { path: focusPath, offset } = selection.focus;
+            try {
+              const [leafNode] = Editor.leaf(
+                markdownEditorRef.current,
+                focusPath,
+              );
+              const leafText = (leafNode as any).text ?? '';
+              if (!(leafNode as any).tag && offset === leafText.length) {
+                const nextSiblingPath = Path.next(focusPath);
+                if (
+                  Editor.hasPath(markdownEditorRef.current, nextSiblingPath)
+                ) {
+                  const [nextNode] = Editor.leaf(
+                    markdownEditorRef.current,
+                    nextSiblingPath,
+                  );
+                  if ((nextNode as any).tag) {
+                    e.preventDefault();
+                    const afterTagPath = Path.next(nextSiblingPath);
+                    if (
+                      Editor.hasPath(markdownEditorRef.current, afterTagPath)
+                    ) {
+                      Transforms.select(markdownEditorRef.current, {
+                        anchor: Editor.start(
+                          markdownEditorRef.current,
+                          afterTagPath,
+                        ),
+                        focus: Editor.start(
+                          markdownEditorRef.current,
+                          afterTagPath,
+                        ),
+                      });
+                    } else {
+                      Transforms.insertNodes(
+                        markdownEditorRef.current,
+                        [{ text: ' ' }],
+                        { at: afterTagPath, select: true },
+                      );
+                    }
+                    return;
+                  }
+                }
+              }
+            } catch {
+              // ignore
             }
           }
         }
