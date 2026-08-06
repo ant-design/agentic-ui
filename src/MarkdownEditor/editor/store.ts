@@ -421,7 +421,7 @@ export class EditorStore {
     const separator = options?.separator ?? /\n\n/;
     const useRAF = options?.useRAF ?? false;
     const batchSize = options?.batchSize ?? 50;
-    const targetPlugins = plugins ?? this.plugins;
+    const targetPlugins = plugins ?? this.plugins ?? [];
 
     if (md.length <= chunkSize) {
       return this._setShortContent(md, targetPlugins, options?.onProgress);

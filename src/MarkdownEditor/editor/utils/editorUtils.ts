@@ -522,7 +522,7 @@ export class EditorUtils {
     let text = '';
 
     // Handle first leaf node from start offset
-    text += leaf.text.slice(start.offset);
+    text += (leaf.text ?? '').slice(start.offset);
 
     // Get next nodes until we reach the end point
     let next = Editor.next(editor, { at: leafPath });
@@ -530,11 +530,11 @@ export class EditorUtils {
     while (next) {
       if (endLeafPath && Path.equals(next[1], endLeafPath)) {
         // If we reach the end path, slice until end offset
-        text += next[0].text.slice(0, end!.offset);
+        text += (next[0].text ?? '').slice(0, end!.offset);
         break;
       } else {
         // Add full text content of intermediate nodes
-        text += next[0].text;
+        text += next[0].text ?? '';
         next = Editor.next(editor, { at: next[1] });
       }
     }
@@ -553,7 +553,7 @@ export class EditorUtils {
   static cutText(editor: Editor, start: Point, end?: Point) {
     const [leaf, leafPath] = Editor.leaf(editor, start);
     let texts: CustomLeaf[] = [
-      { ...leaf, text: leaf.text.slice(start.offset) },
+      { ...leaf, text: (leaf.text ?? '').slice(start.offset) },
     ];
     const endLeafPath = end ? Editor.leaf(editor, end)[1] : null;
     let next = Editor.next(editor, { at: leafPath });
@@ -561,7 +561,7 @@ export class EditorUtils {
       if (endLeafPath && Path.equals(next[1], endLeafPath)) {
         texts.push({
           ...next[0],
-          text: next[0].text.slice(0, end!.offset),
+          text: (next[0].text ?? '').slice(0, end!.offset),
         });
         break;
       } else {
@@ -1424,7 +1424,7 @@ export function findByPathAndText(
 
     // 遍历文本节点查找匹配（生成器已过滤 Text + 非空 text）
     for (const [node, path] of textNodesGenerator) {
-      const text = (node as Text).text;
+      const text = (node as Text).text ?? '';
       // 对每个搜索变体进行匹配
       for (const { variant, pattern } of patterns) {
         let match: RegExpExecArray | null;
@@ -1479,7 +1479,7 @@ export function findByPathAndText(
                 start: matchIndex,
                 end: matchIndex + matchLength,
               },
-              lineContent: lineContent.trim(),
+              lineContent: (lineContent ?? '').trim(),
               nodeType,
               searchVariant:
                 variant !== searchText.trim() ? variant : undefined,

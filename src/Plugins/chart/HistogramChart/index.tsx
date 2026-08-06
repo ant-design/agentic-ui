@@ -233,7 +233,7 @@ const HistogramChart: React.FC<HistogramChartProps> = ({
   const categories = useMemo(() => {
     const uniqueCategories = [
       ...new Set(safeData.map((item) => item?.category)),
-    ].filter(Boolean);
+    ].filter((category): category is string => Boolean(category));
     return uniqueCategories;
   }, [safeData]);
 

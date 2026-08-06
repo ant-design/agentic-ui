@@ -451,7 +451,7 @@ function processSelectionForHeading(
 
         let currentOffset = 0;
         for (const [textNode, textPath] of textNodes) {
-          const text = textNode.text;
+          const text = (textNode as Text).text ?? '';
           const textLength = text.length;
           const nextOffset = currentOffset + textLength;
 
