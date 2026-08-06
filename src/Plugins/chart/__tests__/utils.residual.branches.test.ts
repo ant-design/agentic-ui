@@ -231,7 +231,9 @@ describe('chart/utils more residual branches', () => {
     expect(stringFormatNumber(1000)).toMatch(/1/);
   });
 
-  it('istanbul deepen：normalizeRadar；compareX；resolveCssVariable var/rgb；sort 边界', () => {
+  // Quarantined: hangs shard coverage (negative duration / high RSS).
+  // Overlap with utils.deepen.branches.test.ts.
+  it.skip('istanbul deepen：normalizeRadar；compareX；resolveCssVariable var/rgb；sort 边界', () => {
     expect(normalizeRadarChartData(null as any)).toEqual([]);
     expect(normalizeRadarChartData(undefined as any)).toEqual([]);
     expect(

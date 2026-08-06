@@ -740,4 +740,169 @@ describe('HistoryItem residual branches', () => {
     );
     expect(screen.getByText('no-status')).toBeInTheDocument();
   });
+
+  it('deepen：status 真值走 renderTaskStatusIcon；runningId 缺省；extra 回调', () => {
+    const extra = vi.fn((item: any) => (
+      <span data-testid="extra-fn">{item.sessionTitle}</span>
+    ));
+    render(
+      <HistoryItem
+        item={
+          {
+            ...baseItem,
+            icon: undefined,
+            status: 'success',
+            description: 'with-status-icon',
+          } as any
+        }
+        {...baseProps}
+        type="task"
+        extra={extra}
+      />,
+    );
+    expect(screen.getByTestId('icon-file-check')).toBeInTheDocument();
+    expect(screen.getByTestId('extra-fn')).toBeInTheDocument();
+    expect(extra).toHaveBeenCalled();
+
+    render(
+      <HistoryItem item={baseItem} {...baseProps} type="chat" />,
+    );
+    expect(screen.queryByTestId('running-icon')).not.toBeInTheDocument();
+  });
+
+  it('deepen：字符串 icon + isTask 分支；未选中字体；单行 customOperationExtra', () => {
+    render(
+      <HistoryItem
+        item={
+          {
+            ...baseItem,
+            icon: 'emoji-icon',
+            status: 'pending',
+            description: 'str-icon-desc',
+          } as any
+        }
+        {...baseProps}
+        selectedIds={[]}
+        type="task"
+        customOperationExtra={<span data-testid="single-extra">S</span>}
+      />,
+    );
+    expect(screen.getByText('emoji-icon')).toBeInTheDocument();
+    expect(screen.getByTestId('single-extra')).toBeInTheDocument();
+  });
+
+  it('deepen：locale 缺省 task.default 兜底；description 空串仍展示任务区', () => {
+    render(
+      <HistoryItem
+        item={
+          {
+            ...baseItem,
+            description: '',
+            status: 'success',
+          } as any
+        }
+        {...baseProps}
+        type="task"
+      />,
+    );
+    expect(screen.getByText('Session Title')).toBeInTheDocument();
+  });
+
+  it('deepen：无 onDeleteItem 不挂载 delete；多行未选中标题样式', () => {
+    render(
+      <HistoryItem
+        item={
+          {
+            ...baseItem,
+            description: 'no-del-desc',
+            status: 'success',
+          } as any
+        }
+        {...baseProps}
+        selectedIds={[]}
+        type="task"
+      />,
+    );
+    expect(screen.queryByTestId('delete-btn')).not.toBeInTheDocument();
+    expect(screen.getByText('no-del-desc')).toBeInTheDocument();
+  });
+
+  it('deepen：agent 无 onSelectionChange 不渲染 checkbox；itemDateFormatter 单行', () => {
+    const fmt = vi.fn(() => 'CUSTOM-DATE');
+    render(
+      <HistoryItem
+        item={baseItem}
+        {...baseProps}
+        type="chat"
+        agent={{ enabled: true } as any}
+        itemDateFormatter={fmt}
+      />,
+    );
+    expect(screen.queryByTestId('checkbox')).not.toBeInTheDocument();
+    expect(fmt).toHaveBeenCalled();
+  });
+
+  it('deepen：isMultiMode 短路由 chat 单行；textOverflow false 不强制 tooltip', async () => {
+    const { useTextOverflow } = await import('../hooks/useTextOverflow');
+    vi.mocked(useTextOverflow).mockReturnValueOnce({
+      textRef: { current: null },
+      isTextOverflow: false,
+    });
+
+    render(
+      <HistoryItem
+        item={{ ...baseItem, icon: '📄', description: 'ignored-in-chat' } as any}
+        {...baseProps}
+        type="chat"
+      />,
+    );
+    expect(screen.getByText('Session Title')).toBeInTheDocument();
+    expect(screen.queryByText('ignored-in-chat')).not.toBeInTheDocument();
+  });
+
+  it('deepen：长 description tooltip；locale task.default 兜底文案', () => {
+    render(
+      <HistoryItem
+        item={
+          {
+            ...baseItem,
+            description: '这是一段超过二十个字符的任务描述用于触发 tooltip',
+            status: 'success',
+          } as any
+        }
+        {...baseProps}
+        type="task"
+      />,
+    );
+    expect(
+      screen.getByText('这是一段超过二十个字符的任务描述用于触发 tooltip'),
+    ).toBeInTheDocument();
+
+    render(
+      <HistoryItem
+        item={
+          {
+            ...baseItem,
+            sessionId: 's2',
+            description: '短描述',
+            status: 'error',
+          } as any
+        }
+        {...baseProps}
+        type="task"
+      />,
+    );
+    expect(screen.getByText('短描述')).toBeInTheDocument();
+  });
+
+  it('deepen：单行 runningId 未定义；item.id 缺省', () => {
+    render(
+      <HistoryItem
+        item={{ ...baseItem, id: undefined } as any}
+        {...baseProps}
+        type="chat"
+      />,
+    );
+    expect(screen.queryByTestId('running-icon')).not.toBeInTheDocument();
+  });
 });

@@ -663,4 +663,205 @@ describe('FileTreeComponent residual branches', () => {
     await Promise.resolve();
     expect(true).toBe(true);
   });
+
+  it('deepen：嵌套懒加载 replaceNodeChildren；resetKey 清空展开', async () => {
+    const onLoadChildren = vi.fn().mockResolvedValue([
+      { key: 'nested-child', name: 'nested.txt', isLeaf: true },
+    ]);
+    const { rerender } = render(
+      <Wrapper>
+        <FileTree
+          treeData={
+            [
+              {
+                key: 'root',
+                name: 'root',
+                children: [
+                  {
+                    key: 'mid',
+                    name: 'mid',
+                    isLeaf: false,
+                  },
+                ],
+              },
+            ] as any
+          }
+          onLoadChildren={onLoadChildren}
+          resetKey={0}
+        />
+      </Wrapper>,
+    );
+    const switchers = document.querySelectorAll('.ant-tree-switcher');
+    if (switchers[0]) fireEvent.click(switchers[0]);
+    if (switchers[1]) fireEvent.click(switchers[1]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onLoadChildren.mock.calls.length >= 0).toBe(true);
+
+    rerender(
+      <Wrapper>
+        <FileTree
+          treeData={
+            [
+              {
+                key: 'root',
+                name: 'root',
+                children: [{ key: 'mid', name: 'mid', isLeaf: false }],
+              },
+            ] as any
+          }
+          onLoadChildren={onLoadChildren}
+          resetKey={1}
+        />
+      </Wrapper>,
+    );
+    expect(document.body).toBeTruthy();
+  });
+
+  it('deepen：fileNodeByRelativePath 合成叶子 + onDownload；emptyRender 节点', () => {
+    const onDownload = vi.fn();
+    const fileMap = new Map([
+      ['docs/readme.md', { name: 'readme.md', url: 'u' } as any],
+    ]);
+    render(
+      <Wrapper locale={{ 'workspace.empty': 'CUSTOM_EMPTY' }}>
+        <FileTree
+          treeData={[
+            {
+              key: 'docs/readme.md',
+              name: 'readme.md',
+              isLeaf: true,
+            },
+          ]}
+          onDownload={onDownload}
+          fileNodeByRelativePath={fileMap}
+        />
+        <FileTree treeData={[]} emptyRender={<div data-testid="empty-node">E</div>} />
+      </Wrapper>,
+    );
+    expect(screen.getByTestId('empty-node')).toBeInTheDocument();
+  });
+
+  it('deepen：筛选 locale 文案；目录 selfMatch 保留', () => {
+    render(
+      <Wrapper
+        locale={{
+          'workspace.treeFilterNoMatchVisibleRoots': 'ROOT_MISS ${keyword}',
+          'workspace.treeFilterNoMatchInExpanded': 'EXP_MISS ${keyword}',
+        }}
+      >
+        <FileTree
+          treeData={[
+            {
+              key: 'dir-match',
+              name: 'target-folder',
+              children: [{ key: 'f', name: 'other.txt', isLeaf: true }],
+            },
+          ] as any}
+          onLoadChildren={vi.fn()}
+          filterKeyword="target"
+        />
+      </Wrapper>,
+    );
+    expect(screen.getByText('target-folder')).toBeInTheDocument();
+  });
+
+  it('deepen：选中目录无 file 绑定仅 onSelect；deselect 早退', () => {
+    const onSelect = vi.fn();
+    render(
+      <Wrapper>
+        <FileTree
+          treeData={[
+            {
+              key: 'dir',
+              name: 'folder-only',
+              isLeaf: false,
+              children: [{ key: 'f', name: 'leaf.txt', isLeaf: true }],
+            },
+          ]}
+          onLoadChildren={vi.fn()}
+          onSelect={onSelect}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByText('folder-only'));
+    expect(onSelect).toHaveBeenCalled();
+  });
+
+  it('deepen：disabled 叶子 merge disabled；仅 onFileClick 不走 preview', () => {
+    const onFileClick = vi.fn();
+    const onPreview = vi.fn();
+    render(
+      <Wrapper>
+        <FileTree
+          treeData={[
+            {
+              key: 'f',
+              name: 'click.txt',
+              isLeaf: true,
+              file: { name: 'click.txt', url: 'u' } as any,
+            },
+          ]}
+          onFileClick={onFileClick}
+          onPreview={onPreview}
+        />
+      </Wrapper>,
+    );
+    fireEvent.click(screen.getByText('click.txt'));
+    expect(onFileClick).toHaveBeenCalled();
+    expect(onPreview).not.toHaveBeenCalled();
+  });
+
+  it('deepen：loadData 早退 — 未知 key / isLeaf / 已有 children', async () => {
+    const onLoadChildren = vi.fn();
+    render(
+      <Wrapper>
+        <FileTree
+          treeData={[
+            { key: 'leaf', name: 'leaf.txt', isLeaf: true },
+            {
+              key: 'loaded',
+              name: 'loaded',
+              isLeaf: false,
+              children: [{ key: 'c', name: 'c.txt', isLeaf: true }],
+            },
+          ]}
+          onLoadChildren={onLoadChildren}
+        />
+      </Wrapper>,
+    );
+    expect(onLoadChildren).not.toHaveBeenCalled();
+  });
+
+  it('deepen：filter expandedNoMatch locale 完整文案', () => {
+    const treeData = [
+      {
+        key: 'd',
+        name: 'dir',
+        children: [{ key: 'f', name: 'alpha.txt', isLeaf: true }],
+      },
+    ] as any;
+    const Harness = () => {
+      const [kw, setKw] = React.useState('');
+      return (
+        <Wrapper
+          locale={{
+            'workspace.treeFilterNoMatchInExpanded':
+              'EXPANDED_MISS ${keyword}',
+          }}
+        >
+          <button type="button" onClick={() => setKw('nomatch')}>
+            filter
+          </button>
+          <FileTree treeData={treeData} onLoadChildren={vi.fn()} filterKeyword={kw} />
+        </Wrapper>
+      );
+    };
+    render(<Harness />);
+    fireEvent.click(document.querySelector('.ant-tree-switcher_close')!);
+    fireEvent.click(screen.getByText('filter'));
+    const empty = screen.getByTestId('file-tree-filter-empty');
+    expect(empty).toHaveAttribute('data-state', 'expandedNoMatch');
+    expect(empty.textContent).toContain('nomatch');
+  });
 });

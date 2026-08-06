@@ -2,7 +2,7 @@
  * ActionItemContainer 残留：showMenu false、单子节点、拖拽手柄路径。
  */
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ConfigProvider } from 'antd';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -125,5 +125,94 @@ describe('ActionItemContainer residual branches', () => {
     fireEvent.pointerMove(el, { clientX: 12, pointerId: 1 });
     fireEvent.pointerUp(el, { pointerId: 1 });
     expect(screen.getByTestId('x')).toBeInTheDocument();
+  });
+
+  it('deepen：Popover 打开/关闭；dragOver 同 index；非手柄 mouseUp', async () => {
+    const items = [
+      <button key="a" type="button" data-testid="a">
+        A
+      </button>,
+      <button key="b" type="button" data-testid="b">
+        B
+      </button>,
+    ] as KeyedElement[];
+    const { container } = wrap(<ActionItemContainer>{items}</ActionItemContainer>);
+    const menu = container.querySelector(
+      '[class*="overflow-container-menu"]',
+    ) as HTMLElement;
+    fireEvent.mouseEnter(menu);
+    fireEvent.click(menu);
+
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll('[class*="overflow-container-popup-item"]').length,
+      ).toBe(2);
+    });
+
+    const popupItems = document.querySelectorAll(
+      '[class*="overflow-container-popup-item"]',
+    );
+    const item0 = popupItems[0] as HTMLElement;
+    const handle = item0.querySelector('[class*="drag-handle"]') as HTMLElement;
+    fireEvent.mouseDown(handle);
+    fireEvent.dragStart(item0, {
+      dataTransfer: { effectAllowed: 'move', setData: vi.fn() },
+    });
+    fireEvent.dragOver(item0, { dataTransfer: { dropEffect: 'move' } });
+    fireEvent.mouseUp(item0);
+    fireEvent.dragEnd(item0);
+    fireEvent.mouseLeave(menu);
+    expect(screen.getAllByTestId('a').length).toBeGreaterThan(0);
+  });
+
+  it('deepen：wheel deltaX 主导；pointerCancel；children 批量替换', () => {
+    const initial = [
+      <button key="1" type="button">
+        1
+      </button>,
+      <button key="2" type="button">
+        2
+      </button>,
+      <button key="3" type="button">
+        3
+      </button>,
+    ] as KeyedElement[];
+    const { container, rerender } = wrap(
+      <ActionItemContainer>{initial}</ActionItemContainer>,
+    );
+    const el = container.querySelector(
+      '[class*="agentic-chat-action-item-box"][class*="container"]',
+    ) as HTMLElement;
+    const scrollEl = container.querySelector(
+      '[class*="agentic-chat-action-item-box"][class*="scroll"]',
+    ) as HTMLElement;
+    let scrollLeft = 0;
+    Object.defineProperty(scrollEl, 'scrollLeft', {
+      configurable: true,
+      get: () => scrollLeft,
+      set: (v: number) => {
+        scrollLeft = v;
+      },
+    });
+
+    fireEvent.wheel(el, { deltaX: 15, deltaY: 2 });
+    expect(scrollLeft).toBe(15);
+    fireEvent.pointerDown(el, { button: 0, clientX: 0, pointerId: 3 });
+    fireEvent.pointerCancel(el);
+
+    rerender(
+      <ConfigProvider>
+        <ActionItemContainer>
+          {
+            [
+              <button key="x" type="button" data-testid="repl-x">
+                X
+              </button>,
+            ] as KeyedElement[]
+          }
+        </ActionItemContainer>
+      </ConfigProvider>,
+    );
+    expect(screen.getByTestId('repl-x')).toBeInTheDocument();
   });
 });

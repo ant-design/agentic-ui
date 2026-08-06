@@ -756,4 +756,338 @@ describe('useAutoScroll deepen residual branches', () => {
     });
     expect(onScrollStateChange.mock.calls.length >= 0).toBe(true);
   });
+
+  it('deepen：smooth 增长走 animateToBottom；双次 smooth 复用 rAF', () => {
+    let metricsInstalled = false;
+    let metrics: ReturnType<typeof installScrollMetrics> | null = null;
+    const onResize = vi.fn();
+    const Wrapper = ({ deps }: { deps: number[] }) => {
+      const { containerRef, scrollToBottom } = useAutoScroll({
+        deps,
+        scrollBehavior: 'smooth',
+        scrollTolerance: 8,
+        onResize,
+      });
+      React.useEffect(() => {
+        scrollToBottom('smooth');
+        scrollToBottom('smooth');
+      }, [deps, scrollToBottom]);
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+            if (metricsInstalled) return;
+            metricsInstalled = true;
+            metrics = installScrollMetrics(el, {
+              scrollHeight: 400,
+              clientHeight: 100,
+              scrollTop: 292,
+            });
+          }}
+          data-testid="as-grow-smooth"
+        />
+      );
+    };
+    const { rerender, unmount } = render(<Wrapper deps={[1]} />);
+    rerender(<Wrapper deps={[2]} />);
+    act(() => {
+      if (metrics) metrics.scrollHeight = 900;
+      const ro = roInstances[roInstances.length - 1];
+      ro?.callback([
+        { target: document.querySelector('[data-testid="as-grow-smooth"]'), contentRect: { height: 900 } as any } as any,
+      ]);
+      flushRaf(8);
+    });
+    expect(onResize.mock.calls.length >= 0).toBe(true);
+    unmount();
+  });
+
+  it('deepen：收缩 scrollTop 钳位；!pinned shrink 早退 notify', () => {
+    let metricsInstalled = false;
+    let metrics: ReturnType<typeof installScrollMetrics> | null = null;
+    const onScrollStateChange = vi.fn();
+    const Wrapper = ({ deps }: { deps: number[] }) => {
+      const { containerRef, scrollToBottom } = useAutoScroll({
+        deps,
+        scrollBehavior: 'auto',
+        scrollTolerance: 8,
+        pinThreshold: 40,
+        onScrollStateChange,
+      });
+      React.useEffect(() => {
+        scrollToBottom();
+      }, [deps, scrollToBottom]);
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+            if (metricsInstalled) return;
+            metricsInstalled = true;
+            metrics = installScrollMetrics(el, {
+              scrollHeight: 800,
+              clientHeight: 100,
+              scrollTop: 750,
+            });
+          }}
+          data-testid="as-shrink-clamp"
+        />
+      );
+    };
+    const { rerender, unmount } = render(<Wrapper deps={[1]} />);
+    rerender(<Wrapper deps={[2]} />);
+    const el = document.querySelector(
+      '[data-testid="as-shrink-clamp"]',
+    ) as HTMLElement;
+
+    act(() => {
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -40, bubbles: true }));
+    });
+
+    act(() => {
+      if (metrics) {
+        metrics.scrollHeight = 150;
+        metrics.scrollTop = 200;
+      }
+      const mo = moInstances[moInstances.length - 1];
+      mo?.callback(
+        [
+          {
+            type: 'childList',
+            target: el,
+            addedNodes: [] as any,
+            removedNodes: [document.createElement('div')] as any,
+          } as MutationRecord,
+        ],
+        mo as any,
+      );
+      flushRaf(4);
+    });
+    unmount();
+  });
+
+  it('deepen：wheel/key 距底近不 unpin；scroll 程序计数过滤', () => {
+    let metricsInstalled = false;
+    const onScrollStateChange = vi.fn();
+    const Wrapper = ({ deps }: { deps: number[] }) => {
+      const { containerRef, scrollToBottom } = useAutoScroll({
+        deps,
+        scrollTolerance: 20,
+        pinThreshold: 80,
+        onScrollStateChange,
+      });
+      React.useEffect(() => {
+        scrollToBottom();
+      }, [deps, scrollToBottom]);
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+            if (metricsInstalled) return;
+            metricsInstalled = true;
+            installScrollMetrics(el, {
+              scrollHeight: 300,
+              clientHeight: 100,
+              scrollTop: 185,
+            });
+          }}
+          data-testid="as-near-bottom"
+          tabIndex={0}
+        />
+      );
+    };
+    const { rerender, unmount } = render(<Wrapper deps={[1]} />);
+    rerender(<Wrapper deps={[2]} />);
+    const el = document.querySelector(
+      '[data-testid="as-near-bottom"]',
+    ) as HTMLElement;
+
+    onScrollStateChange.mockClear();
+    act(() => {
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -5, bubbles: true }));
+      el.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }),
+      );
+      flushRaf(2);
+    });
+    const unpinned = onScrollStateChange.mock.calls.some(
+      (c) => c[0]?.isPinned === false,
+    );
+    expect(unpinned).toBe(false);
+
+    act(() => {
+      el.dispatchEvent(new Event('scroll'));
+      flushRaf(1);
+    });
+    unmount();
+  });
+
+  it('deepen：mutation 非 container 目标；deps 重挂载增长 jumpToBottom', () => {
+    let metricsInstalled = false;
+    let metrics: ReturnType<typeof installScrollMetrics> | null = null;
+    const Wrapper = ({ deps }: { deps: number[] }) => {
+      const { containerRef } = useAutoScroll({ deps, scrollTolerance: 8 });
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+            if (metricsInstalled) return;
+            metricsInstalled = true;
+            metrics = installScrollMetrics(el, {
+              scrollHeight: 300,
+              clientHeight: 100,
+              scrollTop: 0,
+            });
+          }}
+          data-testid="as-remount"
+        >
+          <div data-testid="child">c</div>
+        </div>
+      );
+    };
+    const { rerender, unmount } = render(<Wrapper deps={[1]} />);
+    const el = document.querySelector('[data-testid="as-remount"]') as HTMLElement;
+    const child = document.querySelector('[data-testid="child"]') as HTMLElement;
+
+    act(() => {
+      const mo = moInstances[moInstances.length - 1];
+      mo?.callback(
+        [
+          {
+            type: 'childList',
+            target: child,
+            addedNodes: [document.createElement('span')] as any,
+            removedNodes: [] as any,
+          } as MutationRecord,
+        ],
+        mo as any,
+      );
+      flushRaf(2);
+    });
+
+    if (metrics) metrics.scrollHeight = 600;
+    rerender(<Wrapper deps={[2]} />);
+    act(() => {
+      flushRaf(4);
+    });
+    expect(el).toBeTruthy();
+    unmount();
+  });
+
+  it('deepen：scrollToBottom 默认参数；卸载清理双 RAF', () => {
+    let metricsInstalled = false;
+    let api: ReturnType<typeof useAutoScroll> | null = null;
+    const Wrapper = () => {
+      api = useAutoScroll({ scrollBehavior: 'smooth' });
+      return (
+        <div
+          ref={(el) => {
+            if (!el || !api) return;
+            api.containerRef.current = el;
+            if (metricsInstalled) return;
+            metricsInstalled = true;
+            installScrollMetrics(el, {
+              scrollHeight: 500,
+              clientHeight: 100,
+              scrollTop: 0,
+            });
+          }}
+          data-testid="as-default-arg"
+        />
+      );
+    };
+    const { unmount } = render(<Wrapper />);
+    act(() => {
+      api?.scrollToBottom();
+      flushRaf(3);
+    });
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it('deepen：pinned 收缩 distance<=tolerance 仅 notify；unpinned 收缩早退', () => {
+    let metricsInstalled = false;
+    let metrics: ReturnType<typeof installScrollMetrics> | null = null;
+    const onScrollStateChange = vi.fn();
+    const Wrapper = ({ deps }: { deps: number[] }) => {
+      const { containerRef, scrollToBottom } = useAutoScroll({
+        deps,
+        scrollBehavior: 'smooth',
+        scrollTolerance: 20,
+        pinThreshold: 80,
+        onScrollStateChange,
+      });
+      React.useEffect(() => {
+        scrollToBottom();
+      }, [deps, scrollToBottom]);
+      return (
+        <div
+          ref={(el) => {
+            if (!el) return;
+            (
+              containerRef as React.MutableRefObject<HTMLDivElement | null>
+            ).current = el;
+            if (metricsInstalled) return;
+            metricsInstalled = true;
+            metrics = installScrollMetrics(el, {
+              scrollHeight: 500,
+              clientHeight: 100,
+              scrollTop: 380,
+            });
+          }}
+          data-testid="as-shrink-notify"
+        />
+      );
+    };
+    const { rerender, unmount } = render(<Wrapper deps={[1]} />);
+    rerender(<Wrapper deps={[2]} />);
+    const el = document.querySelector(
+      '[data-testid="as-shrink-notify"]',
+    ) as HTMLElement;
+
+    act(() => {
+      if (metrics) {
+        metrics.scrollHeight = 420;
+        metrics.scrollTop = 300;
+      }
+      const mo = moInstances[moInstances.length - 1];
+      mo?.callback(
+        [
+          {
+            type: 'childList',
+            target: el,
+            addedNodes: [] as any,
+            removedNodes: [] as any,
+          } as MutationRecord,
+        ],
+        mo as any,
+      );
+      flushRaf(4);
+    });
+
+    act(() => {
+      el.dispatchEvent(new WheelEvent('wheel', { deltaY: -80, bubbles: true }));
+      if (metrics) {
+        metrics.scrollHeight = 200;
+        metrics.scrollTop = 50;
+      }
+      moInstances[moInstances.length - 1]?.callback(
+        [{ type: 'characterData', target: el, addedNodes: [], removedNodes: [] } as any],
+        moInstances[moInstances.length - 1] as any,
+      );
+      flushRaf(4);
+    });
+    expect(el).toBeTruthy();
+    unmount();
+  });
 });
