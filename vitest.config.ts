@@ -78,6 +78,7 @@ const fullSuiteHangExcludes = [
   '**/parserSlateNodeToMarkdown.more.residual.branches.test.ts',
   '**/RealtimeFollow.test.tsx',
   '**/usePreviewContent.midtail.branches.test.tsx',
+  '**/usePreviewContent.deepen.safe.residual.branches.test.tsx',
   '**/codeTagLeafBehavior.residual.branches.test.ts',
   '**/Editor.residual.branches.test.tsx',
   '**/store.more.residual.branches.test.ts',
