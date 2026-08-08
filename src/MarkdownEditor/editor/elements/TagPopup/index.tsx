@@ -211,11 +211,16 @@ const loadItemsData = async (
   if (typeof items !== 'function') return;
 
   setLoading(true);
-  const result = await items(props);
-  if (Array.isArray(result)) {
-    setSelectedItems(result);
+  try {
+    const result = await items(props);
+    if (Array.isArray(result)) {
+      setSelectedItems(result);
+    }
+  } catch {
+    // items 加载失败时保留已有选项，避免未处理的 Promise rejection
+  } finally {
+    setLoading(false);
   }
-  setLoading(false);
 };
 
 const initializeAutoOpen = (

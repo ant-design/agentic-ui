@@ -173,6 +173,7 @@ describe('ChartRender deepen branches', () => {
       expect(runtimeProps.pie.length).toBeGreaterThan(0);
       expect(runtimeProps.bar.length).toBeGreaterThan(0);
       expect(runtimeProps.funnel.length).toBeGreaterThan(0);
+      expect(runtimeProps.histogram.length).toBeGreaterThan(0);
     });
 
     expect(runtimeProps.pie[0]?.height ?? runtimeProps.pie[0]?.width).toBe(360);
