@@ -123,4 +123,41 @@ describe('ReadonlyMarkdownEditorView deepen residual branches', () => {
     expect(ref.current?.store).toBeTruthy();
     expect(screen.queryByTestId('comment-list')).toBeNull();
   });
+
+  it('deepen2：空 id 不设 attr；数字 id；children；report/slide class', () => {
+    const { container, rerender } = render(
+      <ReadonlyMarkdownEditorView
+        initValue="fallback-content"
+        id={'' as any}
+        toc={false}
+      >
+        <span data-testid="child">kid</span>
+      </ReadonlyMarkdownEditorView>,
+    );
+    expect(
+      container
+        .querySelector('[data-testid="markdown-editor"]')
+        ?.getAttribute('id'),
+    ).toBeFalsy();
+    expect(screen.getByText('fallback-content')).toBeInTheDocument();
+    expect(screen.getByTestId('child')).toBeInTheDocument();
+
+    rerender(
+      <ReadonlyMarkdownEditorView
+        initValue="x"
+        id={7 as any}
+        reportMode
+        slideMode
+        toc={false}
+      />,
+    );
+    expect(
+      container
+        .querySelector('[data-testid="markdown-editor"]')
+        ?.getAttribute('id'),
+    ).toBe('7');
+    expect(
+      container.querySelector('[data-testid="markdown-editor"]')?.className,
+    ).toMatch(/report|slide/);
+  });
 });
