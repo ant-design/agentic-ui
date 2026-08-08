@@ -258,7 +258,8 @@ export const createMediaNodeFromElement = (
     img: 'image',
   };
 
-  const mediaType = mediaTypeMap[mediaElement.tagName];
+  // 未知标签回退为 image，与历史 createMediaNodeFromElement 行为一致
+  const mediaType = mediaTypeMap[mediaElement.tagName] || 'image';
 
   return EditorUtils.createMediaNode(
     decodeURIComponentUrl(mediaElement.url || ''),
