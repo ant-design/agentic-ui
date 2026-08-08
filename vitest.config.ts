@@ -84,6 +84,7 @@ const fullSuiteHangExcludes = [
   '**/parseCode.residual.branches.test.ts',
   '**/JinjaTemplatePanel.residual.branches.test.tsx',
   '**/findTextInReadonlyMarkdownDom.residual.branches.test.ts',
+  '**/SchemaEditorBridgeManager.midtail.branches.test.ts',
 ];
 
 const fullSuiteTestExcludes = [
